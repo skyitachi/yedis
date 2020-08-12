@@ -7,9 +7,12 @@
 #include <vector>
 #include <mutex>
 #include <cstring>
+#include <spdlog/spdlog.h>
 
 const char *kDBPath = "data";
 const char *kMetaKey = "meta_";
+const char *kIndexKeyPrefix = "index_";
+
 std::mutex gMutex;
 const rocksdb::ReadOptions default_read_options_;
 const rocksdb::WriteOptions default_write_options_;
@@ -46,13 +49,15 @@ void zadd(rocksdb::DB* db, const std::string& key, int score, const std::string&
   auto status = db->Get(default_read_options_, meta_key, &value);
 
   if (status.IsNotFound()) {
-    PutFixed32(&meta_value, 1);
+    PutFixed32(&meta_value, 0);
     batch.Put(meta_key, meta_value);
   } else {
     count = DecodeFixed32(value.c_str());
-    PutFixed32(&meta_value, count + 1);
+    count += 1;
+    PutFixed32(&meta_value, count);
     batch.Put(meta_key, meta_value);
   }
+  spdlog::info("current count {}", count);
   // value_key = key + score + member
   std::string value_key = key;
   PutFixed32(&value_key, score);
@@ -60,8 +65,10 @@ void zadd(rocksdb::DB* db, const std::string& key, int score, const std::string&
   batch.Put(value_key, rocksdb::Slice());
 
   // index
-  std::string index_key = key;
+  std::string index_key = kIndexKeyPrefix + key;
   PutFixed32(&index_key, count);
+  spdlog::info("index_key: {}", index_key.size());
+  spdlog::info("member value: {}", member);
   batch.Put(index_key, member);
 //  std::string index_value;
 //  PutFixed32(&index_value, score);
@@ -73,7 +80,7 @@ void zadd(rocksdb::DB* db, const std::string& key, int score, const std::string&
 }
 
 std::vector<std::string> zrange(rocksdb::DB *db, const std::string& key, int start, int stop) {
-  std::string index_key = key;
+  std::string index_key = kIndexKeyPrefix + key;
   PutFixed32(&index_key, start);
 
   // use iterator
@@ -84,8 +91,9 @@ std::vector<std::string> zrange(rocksdb::DB *db, const std::string& key, int sta
   std::vector<std::string> ret;
   int count = 0;
   for (it->Seek(lower_bound); it->Valid(); it->Next()) {
-    ret.push_back(it->value().ToString());
-    if (start + count > stop) {
+    spdlog::info("key: {}", it->key().ToString(true));
+    ret.push_back(it->value().ToString(true));
+    if (start + count >= stop) {
       break;
     }
     count += 1;
