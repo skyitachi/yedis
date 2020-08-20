@@ -5,6 +5,7 @@
 #ifndef YEDIS_INCLUDE_UTIL_HPP_
 #define YEDIS_INCLUDE_UTIL_HPP_
 #include <string>
+#include <cstring>
 
 namespace yedis {
 inline void EncodeFixed32(char* dst, uint32_t value) {
