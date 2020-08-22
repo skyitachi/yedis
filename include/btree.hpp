@@ -21,6 +21,7 @@ struct Entry {
   byte* value;
 };
 
+// 继承page
 class BTreeNode {
   public:
     BTreeNode(): t_(MAX_DEGREE){
@@ -43,6 +44,7 @@ class BTreeNode {
     // node offset in file;
     int64_t offset_;
     Entry* entries_;
+    // Page
 };
 
 class BTree {
