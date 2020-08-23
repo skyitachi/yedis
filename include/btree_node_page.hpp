@@ -9,24 +9,34 @@
 #include "page.hpp"
 
 namespace yedis {
+/**
+ * header + slots + entries
+ * header:
+ * 4 byte(page_id) + 4 byte(entries count) + 4 byte(degree) + 1 byte(flag)
+ */
 class BTreeNodePage: public Page {
- public:
+  static constexpr int ENTRY_COUNT_OFFSET = 4;
+  static constexpr int DEGREE_OFFSET = 8;
+  static constexpr int FLAG_OFFSET = 12;
+  static constexpr int KEY_POS_OFFSET = 13;
 
- private:
-  // TODO: 不需要这些字段，通过解释data即可实现
-  int n_current_entry_;
-  // degree
-  int t_;
-  // leaf node flag
-  byte flag_;
-  // key pos
-  int64_t *keyPos_;
-  // child pos
-  int64_t *childPos_;
-  // node offset in file;
-  int64_t offset_;
-  Entry* entries_;
-  //
+ public:
+  // n_current_entry_
+  inline int GetCurrentEntries() { return *reinterpret_cast<int *>(GetData() + ENTRY_COUNT_OFFSET); }
+  // degree t
+  inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
+  // is leaf node
+  inline bool IsLeafNode() {
+    return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 1;
+  }
+  // key pos start
+  inline int64_t* KeyPosStart() {
+    return reinterpret_cast<int64_t*>(GetData() + KEY_POS_OFFSET);
+  }
+  // child pos start
+  inline int64_t* ChildPosStart() {
+    return reinterpret_cast<int64_t*>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
+  }
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_

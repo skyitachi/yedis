@@ -15,5 +15,13 @@ struct ScoreMember {
     return (sm.score == score && sm.member == member);
   }
 };
+
+class DiskManager;
+class BufferPoolManager;
+class YedisInstance {
+ public:
+  DiskManager* disk_manager;
+  BufferPoolManager* buffer_pool_manager;
+};
 }
 #endif //YEDIS_INCLUDE_YEDIS_HPP_
