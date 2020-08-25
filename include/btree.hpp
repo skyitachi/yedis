@@ -6,10 +6,9 @@
 #define YEDIS_INCLUDE_BTREE_NODE_HPP_
 #include <string>
 #include "yedis.hpp"
+#include "config.hpp"
 
 namespace yedis {
-#define PAGE_BLOCK 4096
-#define MAX_DEGREE (PAGE_BLOCK / 33)
 
 typedef uint8_t byte;
 struct Entry {
@@ -47,11 +46,17 @@ class BTreeNode {
     // Page
 };
 
+class BTreeNodePage;
+class YedisInstance;
 class BTree {
  public:
-   Status add(byte* key, byte* value);
+  BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {};
+  Status init();
+  Status add(byte* key, byte* value);
  private:
-   BTreeNode* root;
+  BTreeNodePage * root;
+  std::string file_name_;
+  YedisInstance* yedis_instance_;
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_NODE_HPP_

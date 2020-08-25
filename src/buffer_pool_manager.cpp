@@ -5,6 +5,8 @@
 #include <spdlog/spdlog.h>
 namespace yedis {
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance) {
+  assert(pool_size != 0);
+  pool_size_ = pool_size;
   pages_ = new Page[pool_size];
   yedis_instance_ = yedis_instance;
 }

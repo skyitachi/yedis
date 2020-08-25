@@ -8,7 +8,7 @@
 namespace yedis {
   DiskManager::DiskManager(const std::string &db_file) {
     file_name_ = db_file;
-    db_io_ = std::fstream(db_file, db_io_.binary | db_io_.in | db_io_.in);
+    db_io_ = std::fstream(db_file, std::ios::binary | std::ios::in | std::ios::out);
     assert(db_io_.is_open());
   }
 
