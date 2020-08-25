@@ -22,6 +22,8 @@ int main() {
   yInstance->buffer_pool_manager = buffer_pool_manager;
   auto zsetIndexTree = new yedis::BTree(yInstance);
   zsetIndexTree->init();
+  zsetIndexTree->add("k1", "v1");
+  yInstance->buffer_pool_manager->Flush();
 
 //  rocksdb::DB* db;
 //  rocksdb::Options options;

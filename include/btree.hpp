@@ -7,6 +7,7 @@
 #include <string>
 #include "yedis.hpp"
 #include "config.hpp"
+#include "yedis_zset.hpp"
 
 namespace yedis {
 
@@ -52,7 +53,7 @@ class BTree {
  public:
   BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {};
   Status init();
-  Status add(byte* key, byte* value);
+  Status add(const Slice &key, const Slice &value);
  private:
   BTreeNodePage * root;
   std::string file_name_;

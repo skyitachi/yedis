@@ -21,13 +21,17 @@ class BTreeNodePage: public Page {
   static constexpr int KEY_POS_OFFSET = 13;
 
  public:
+  // page_id
+  inline page_id_t GetPageID() {
+    return *reinterpret_cast<page_id_t*>(GetData());
+  }
   // n_current_entry_
   inline int GetCurrentEntries() { return *reinterpret_cast<int *>(GetData() + ENTRY_COUNT_OFFSET); }
   // degree t
   inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
   // is leaf node
   inline bool IsLeafNode() {
-    return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 1;
+    return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
   }
   // key pos start
   inline int64_t* KeyPosStart() {
@@ -37,6 +41,24 @@ class BTreeNodePage: public Page {
   inline int64_t* ChildPosStart() {
     return reinterpret_cast<int64_t*>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
   }
+  // entries pointer
+  inline Entry* EntryPosStart() {
+    return reinterpret_cast<Entry*>(ChildPosStart() + 2 * GetDegree() * sizeof(int64_t));
+  }
+  //
+  Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
+
+  void init(int degree) {
+    t_ = degree;
+    cur_entries_ = GetCurrentEntries();
+    page_id_ = GetPageID();
+  };
+
+ private:
+  int t_;
+  int cur_entries_;
+  int upper_bound(const byte *key);
+
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_

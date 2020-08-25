@@ -22,6 +22,7 @@ class BufferPoolManager {
 
   Page *NewPage(page_id_t* page_id);
 
+  Status Flush();
  private:
   size_t pool_size_;
   YedisInstance* yedis_instance_;

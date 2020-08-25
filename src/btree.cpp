@@ -5,11 +5,13 @@
 
 #include <btree.hpp>
 #include <buffer_pool_manager.hpp>
+#include <btree_node_page.hpp>
 
 namespace yedis {
 
-Status BTreeNode::add(byte *key, byte *value) {
-  return Status::NotSupported();
+Status BTree::add(const Slice &key, const Slice& value) {
+  return root->add(reinterpret_cast<const byte*>(key.data()), key.size(),
+            reinterpret_cast<const byte*>(value.data()), value.size());
 }
 
 Status BTree::init() {
