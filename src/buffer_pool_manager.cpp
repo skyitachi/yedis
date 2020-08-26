@@ -33,7 +33,6 @@ Page* BufferPoolManager::NewPage(page_id_t *page_id) {
 Status BufferPoolManager::Flush() {
   for (int i = 0; i < pool_size_; i++) {
     if (pages_[i].IsDirty()) {
-      spdlog::info("page_id: {} is dirty", pages_[i].GetPageId());
       yedis_instance_->disk_manager->WritePage(pages_[i].GetPageId(), pages_[i].GetData());
     }
   }

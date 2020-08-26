@@ -6,27 +6,39 @@
 #include <iostream>
 
 #include <disk_manager.hpp>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace yedis {
   DiskManager::DiskManager(const std::string &db_file) {
     file_name_ = db_file;
-    db_io_ = std::fstream(db_file, std::ios::binary | std::ios::in | std::ios::out);
-    assert(db_io_.is_open());
+    fd_ = open(db_file.c_str(), O_RDWR | O_CREAT, 0644);
+    if (fd_ < 0) {
+      spdlog::error("{} open failed {}", db_file, strerror(errno));
+      throw "open failed";
+    }
   }
 
   void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
-    db_io_.seekp(page_id * PAGE_SIZE);
-    db_io_.read(page_data, PAGE_SIZE);
+    lseek(fd_, page_id * PAGE_SIZE, SEEK_SET);
+    int sz = read(fd_, page_data, PAGE_SIZE);
+    if (sz != PAGE_SIZE) {
+      spdlog::info("read page error, {}", sz);
+    } else {
+      spdlog::info("read success");
+    }
   }
 
   void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
-    db_io_.seekp(page_id * PAGE_SIZE);
-    spdlog::info("write to disk data: {}", page_data);
-    for (int i = 0; i < 12; i++) {
-      std::cout << page_data[i];
+    lseek(fd_, page_id * PAGE_SIZE, SEEK_SET);
+    spdlog::info("write to disk data: page_id {}, page_size {}, db file: {}", page_id, PAGE_SIZE, file_name_);
+    int written = write(fd_, page_data, PAGE_SIZE);
+    if (written != PAGE_SIZE) {
+      spdlog::error("write to disk error, written {} data", written);
+    } else {
+      spdlog::info("write success");
     }
-    std::cout << std::endl;
-    db_io_.write(page_data, PAGE_SIZE);
   }
 
   page_id_t DiskManager::AllocatePage() {
@@ -34,10 +46,7 @@ namespace yedis {
   }
 
   void DiskManager::ShutDown() {
-    spdlog::info("shutdown disk manager");
-    db_io_ << "hello world";
-    db_io_.flush();
-    db_io_.close();
+    close(fd_);
   }
 
   int DiskManager::GetFileSize(const std::string &file_name) {

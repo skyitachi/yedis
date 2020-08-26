@@ -17,8 +17,11 @@ const char *kIndexFile = "btree.idx";
 void test_fstream() {
   std::fstream test_file("test.idx", std::ios::in | std::ios::out | std::ios::binary);
   if (test_file.is_open()) {
+    char data[4096]{};
+    memcpy(data, "hello world", 11);
     spdlog::info("open test file");
-    test_file << "hello world";
+    test_file.seekp(0);
+    test_file.write(data, 4096);
     test_file.flush();
     test_file.close();
   } else {

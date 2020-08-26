@@ -28,13 +28,13 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 void BTreeNodePage::writeHeader() {
   spdlog::debug("before write page_id");
   memcpy(GetData(), reinterpret_cast<char *>(&page_id_), sizeof(page_id_t));
-  spdlog::debug("after write page_id");
+  spdlog::debug("after write page_id: {}", page_id_);
 
   memcpy(GetData() + ENTRY_COUNT_OFFSET, reinterpret_cast<char *>(&cur_entries_), sizeof(int));
-  spdlog::debug("after write entry count");
+  spdlog::debug("after write entry count: {}", cur_entries_);
 
   memcpy(GetData() + DEGREE_OFFSET, reinterpret_cast<char*>(&t_), sizeof(int));
-  spdlog::debug("after write degree");
+  spdlog::debug("after write degree: {}", t_);
 }
 
 void BTreeNodePage::init(int degree, page_id_t page_id) {

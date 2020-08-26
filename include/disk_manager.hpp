@@ -32,9 +32,8 @@ class DiskManager {
  private:
   int GetFileSize(const std::string &file_name);
 
-  std::fstream db_io_;
   std::string file_name_;
-
+  int fd_;
   std::atomic<page_id_t > next_page_id_;
 };
 }
