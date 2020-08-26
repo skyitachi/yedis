@@ -48,13 +48,10 @@ class BTreeNodePage: public Page {
   //
   Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
 
-  void init(int degree) {
-    t_ = degree;
-    cur_entries_ = GetCurrentEntries();
-    page_id_ = GetPageID();
-  };
+  void init(int degree, page_id_t page_id);
 
  private:
+  void writeHeader();
   int t_;
   int cur_entries_;
   int upper_bound(const byte *key);

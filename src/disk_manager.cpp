@@ -1,9 +1,11 @@
 //
 // Created by skyitachi on 2020/8/23.
 //
+#include <spdlog/spdlog.h>
+#include <cassert>
+#include <iostream>
 
 #include <disk_manager.hpp>
-#include <cassert>
 
 namespace yedis {
   DiskManager::DiskManager(const std::string &db_file) {
@@ -18,7 +20,12 @@ namespace yedis {
   }
 
   void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
-    db_io_.seekp(page_id);
+    db_io_.seekp(page_id * PAGE_SIZE);
+    spdlog::info("write to disk data: {}", page_data);
+    for (int i = 0; i < 12; i++) {
+      std::cout << page_data[i];
+    }
+    std::cout << std::endl;
     db_io_.write(page_data, PAGE_SIZE);
   }
 
@@ -27,6 +34,9 @@ namespace yedis {
   }
 
   void DiskManager::ShutDown() {
+    spdlog::info("shutdown disk manager");
+    db_io_ << "hello world";
+    db_io_.flush();
     db_io_.close();
   }
 

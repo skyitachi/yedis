@@ -18,6 +18,7 @@ Status BTree::init() {
   page_id_t root_page_id;
   root = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&root_page_id));
   spdlog::info("open btree successfully with page_id {}", root_page_id);
+  root->init(MAX_DEGREE, root_page_id);
   return Status::OK();
 }
 }
