@@ -43,7 +43,9 @@ class BTreeNodePage: public Page {
   }
   // entries pointer
   inline Entry* EntryPosStart() {
-    return reinterpret_cast<Entry*>(ChildPosStart() + 2 * GetDegree() * sizeof(int64_t));
+    auto offset = KEY_POS_OFFSET + (4 * t_ - 1) * sizeof(int64_t);
+    auto entryStart = reinterpret_cast<char *>(GetData() + offset);
+    return reinterpret_cast<Entry*>(entryStart);
   }
   //
   Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);

@@ -29,6 +29,8 @@ class DiskManager {
 
   page_id_t AllocatePage();
 
+  void Destroy();
+
  private:
   int GetFileSize(const std::string &file_name);
 

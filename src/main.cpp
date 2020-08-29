@@ -14,23 +14,7 @@
 const char *kDBPath = "data";
 const char *kIndexFile = "btree.idx";
 
-void test_fstream() {
-  std::fstream test_file("test.idx", std::ios::in | std::ios::out | std::ios::binary);
-  if (test_file.is_open()) {
-    char data[4096]{};
-    memcpy(data, "hello world", 11);
-    spdlog::info("open test file");
-    test_file.seekp(0);
-    test_file.write(data, 4096);
-    test_file.flush();
-    test_file.close();
-  } else {
-    spdlog::error("cannot open test file");
-  }
-}
-
 int main() {
-  test_fstream();
   spdlog::set_level(spdlog::level::debug);
   auto disk_manager = new yedis::DiskManager(kIndexFile);
   auto yInstance = new yedis::YedisInstance();
@@ -43,6 +27,7 @@ int main() {
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();
+  zsetIndexTree->destroy();
 //  rocksdb::DB* db;
 //  rocksdb::Options options;
 //  options.create_if_missing = true;

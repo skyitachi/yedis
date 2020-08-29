@@ -10,11 +10,14 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   if (IsLeafNode()) {
     upper_bound(key);
     auto entries = EntryPosStart();
+    printf("entry start address: %p\n", entries);
+    printf("data start address: %p\n", GetData());
+    spdlog::debug("entry offset: {}", reinterpret_cast<char*>(entries) - GetData());
     // write value
     entries[cur_entries_].flag = 0;
     entries[cur_entries_].key_len = k_len;
     spdlog::debug("before memcpy");
-//    memcpy(entries[cur_entries_].key, key, k_len);
+    memcpy(entries[cur_entries_].key, key, k_len);
     spdlog::debug("after memcpy");
     entries[cur_entries_].value_len = v_len;
 //    memcpy(entries[cur_entries_].value, value, v_len);

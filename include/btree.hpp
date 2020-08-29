@@ -54,6 +54,7 @@ class BTree {
   BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {};
   Status init();
   Status add(const Slice &key, const Slice &value);
+  Status destroy();
  private:
   BTreeNodePage * root;
   std::string file_name_;

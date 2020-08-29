@@ -52,4 +52,8 @@ namespace yedis {
   int DiskManager::GetFileSize(const std::string &file_name) {
     return -1;
   }
+
+  void DiskManager::Destroy() {
+    unlink(file_name_.c_str());
+  }
 }
