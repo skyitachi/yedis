@@ -15,10 +15,6 @@ namespace yedis {
  * 4 byte(page_id) + 4 byte(entries count) + 4 byte(degree) + 1 byte(flag)
  */
 class BTreeNodePage: public Page {
-  static constexpr int ENTRY_COUNT_OFFSET = 4;
-  static constexpr int DEGREE_OFFSET = 8;
-  static constexpr int FLAG_OFFSET = 12;
-  static constexpr int KEY_POS_OFFSET = 13;
 
  public:
   // page_id
@@ -54,9 +50,14 @@ class BTreeNodePage: public Page {
 
  private:
   void writeHeader();
+  size_t available();
   int t_;
   int cur_entries_;
   int upper_bound(const byte *key);
+  // TODO: value page cnt
+  int value_page_cnt_;
+  // TODO: value page should be allocated by buffer_pool_manger
+  // innodb how to design primary key data format
 
 };
 }

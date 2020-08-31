@@ -37,7 +37,14 @@ using lsn_t = int32_t;         // log sequence number type
 using slot_offset_t = size_t;  // slot offset type
 using oid_t = uint16_t;
 
-static constexpr int MAX_DEGREE = PAGE_SIZE / 33;
+static constexpr int MAX_DEGREE = PAGE_SIZE / 2 / 33;
+
+// page format
+static constexpr int ENTRY_COUNT_OFFSET = 4;
+static constexpr int DEGREE_OFFSET = 8;
+static constexpr int FLAG_OFFSET = 12;
+static constexpr int KEY_POS_OFFSET = 13;
+static constexpr int ENTRY_OFFSET =  KEY_POS_OFFSET + (4 * MAX_DEGREE - 1) * sizeof(uint32_t);
 
 }
 #endif //YEDIS_INCLUDE_CONFIG_HPP_

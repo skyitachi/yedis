@@ -68,5 +68,17 @@ int BTreeNodePage::upper_bound(const byte *key) {
   start[i] = cur_entries;
   return i;
 }
+
+size_t BTreeNodePage::available() {
+  auto n_entries = GetCurrentEntries();
+  auto entries = EntryPosStart();
+  auto sz = 0;
+  for(int i = 0; i < n_entries; i++) {
+    sz += entries[i].key_len + entries[i].value_len + sizeof(uint32_t) * 2 + sizeof(byte);
+  }
+
+
+}
+
 }
 
