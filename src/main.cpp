@@ -27,7 +27,7 @@ int main() {
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();
-  zsetIndexTree->destroy();
+  // zsetIndexTree->destroy();
 //  rocksdb::DB* db;
 //  rocksdb::Options options;
 //  options.create_if_missing = true;

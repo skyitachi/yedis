@@ -38,10 +38,10 @@ class BTreeNodePage: public Page {
     return reinterpret_cast<int64_t*>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
   }
   // entries pointer
-  inline Entry* EntryPosStart() {
+  inline byte* EntryPosStart() {
     auto offset = KEY_POS_OFFSET + (4 * t_ - 1) * sizeof(int64_t);
-    auto entryStart = reinterpret_cast<char *>(GetData() + offset);
-    return reinterpret_cast<Entry*>(entryStart);
+    auto entryStart = reinterpret_cast<byte *>(GetData() + offset);
+    return reinterpret_cast<byte*>(entryStart);
   }
   //
   Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
@@ -51,9 +51,11 @@ class BTreeNodePage: public Page {
  private:
   void writeHeader();
   size_t available();
+  int upper_bound(const byte *key);
   int t_;
   int cur_entries_;
-  int upper_bound(const byte *key);
+  std::string buf_;
+  std::vector<Entry> entries_;
   // TODO: value page cnt
   int value_page_cnt_;
   // TODO: value page should be allocated by buffer_pool_manger

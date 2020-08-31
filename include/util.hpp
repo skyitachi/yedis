@@ -29,6 +29,11 @@ inline void PutFixed32(std::string* dst, uint32_t value) {
   dst->append(buf, sizeof(buf));
 }
 
+inline void PutByte(std::string* dst, char value) {
+  char buf[1] = {value};
+  dst->append(buf, 1);
+}
+
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

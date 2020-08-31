@@ -14,13 +14,12 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
     printf("data start address: %p\n", GetData());
     spdlog::debug("entry offset: {}", reinterpret_cast<char*>(entries) - GetData());
     // write value
-    entries[cur_entries_].flag = 0;
-    entries[cur_entries_].key_len = k_len;
-    spdlog::debug("before memcpy");
-    memcpy(entries[cur_entries_].key, key, k_len);
-    spdlog::debug("after memcpy");
-    entries[cur_entries_].value_len = v_len;
-//    memcpy(entries[cur_entries_].value, value, v_len);
+    buf_.resize(0);
+    PutByte(&buf_, 0);
+    PutFixed32(&buf_, k_len);
+    buf_.append(reinterpret_cast<const char *>(key), k_len);
+    PutFixed32(&buf_, v_len);
+    buf_.append(reinterpret_cast<const char *>(value), v_len);
     cur_entries_ += 1;
   }
   SetIsDirty(true);
@@ -47,17 +46,33 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   spdlog::info("cur_entries from file: {}", GetCurrentEntries());
   page_id_ = page_id;
   spdlog::info("page_id from file: {}", GetPageID());
+  // read entries
+  // must
+  auto entries_start = EntryPosStart();
+  spdlog::info("entries_offset: {}", reinterpret_cast<char *>(entries_start) - GetData());
+  printf("entries_start %p\n", entries_start + 1);
+  printf("data_ %p\n", GetData() + 1990);
+
+  for (int i = 0; i < cur_entries_; i++) {
+    Entry entry;
+    entry.flag = reinterpret_cast<byte>(entries_start[0]);
+    entry.key_len = DecodeFixed32(reinterpret_cast<const char *>(entries_start + 1));
+    entry.key = reinterpret_cast<byte *>(entries_start + 5);
+    spdlog::info("key_len: {}", entry.key_len);
+    spdlog::info("key: {}", std::string(reinterpret_cast<char *>(entry.key), entry.key_len));
+    entry.value_len = DecodeFixed32(reinterpret_cast<const char*>(entries_start[5 + entry.key_len]));
+    entry.value = reinterpret_cast<byte *>(entries_start[9 + entry.key_len]);
+  }
 }
 
 int BTreeNodePage::upper_bound(const byte *key) {
   auto cur_entries = GetCurrentEntries();
   auto start = KeyPosStart();
-  auto entries = EntryPosStart();
   int i;
   for(i = cur_entries - 1; i >= 0; i--) {
     auto offset = start[i];
-    auto target_key = entries[offset].key;
-    if (memcmp(key, target_key, entries[offset].key_len) >= 0) {
+    auto target_key = entries_[offset].key;
+    if (memcmp(key, target_key, entries_[offset].key_len) >= 0) {
       break;
     }
     start[i + 1] = start[i];
@@ -71,14 +86,14 @@ int BTreeNodePage::upper_bound(const byte *key) {
 
 size_t BTreeNodePage::available() {
   auto n_entries = GetCurrentEntries();
-  auto entries = EntryPosStart();
   auto sz = 0;
   for(int i = 0; i < n_entries; i++) {
-    sz += entries[i].key_len + entries[i].value_len + sizeof(uint32_t) * 2 + sizeof(byte);
+    sz += entries_[i].key_len + entries_[i].value_len + sizeof(uint32_t) * 2 + sizeof(byte);
   }
-
-
+  return sz;
 }
+
+
 
 }
 
