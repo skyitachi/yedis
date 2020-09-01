@@ -22,8 +22,12 @@ int main() {
   auto buffer_pool_manager = new yedis::BufferPoolManager(16, yInstance);
   yInstance->buffer_pool_manager = buffer_pool_manager;
   auto zsetIndexTree = new yedis::BTree(yInstance);
-  zsetIndexTree->init();
-  zsetIndexTree->add("k1", "v1");
+
+  for (int i = 0; i < 10; i++) {
+    std::string k = "k";
+    std::string v = "v";
+    zsetIndexTree->add(k + std::to_string(i), v + std::to_string(i));
+  }
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();

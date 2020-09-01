@@ -5,8 +5,11 @@
 #ifndef YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_
 #define YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_
 
+#include <unordered_map>
+
 #include "btree.hpp"
 #include "page.hpp"
+
 
 namespace yedis {
 /**
@@ -56,6 +59,8 @@ class BTreeNodePage: public Page {
   int cur_entries_;
   std::string buf_;
   std::vector<Entry> entries_;
+  // entry tail
+  size_t entry_tail_;
   // TODO: value page cnt
   int value_page_cnt_;
   // TODO: value page should be allocated by buffer_pool_manger

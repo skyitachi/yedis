@@ -9,7 +9,7 @@ namespace yedis {
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len) {
   if (IsLeafNode()) {
     upper_bound(key);
-    auto entries = EntryPosStart();
+    auto entries = GetData() + entry_tail_;
     printf("entry start address: %p\n", entries);
     printf("data start address: %p\n", GetData());
     spdlog::debug("entry offset: {}", reinterpret_cast<char*>(entries) - GetData());
@@ -20,7 +20,10 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
     buf_.append(reinterpret_cast<const char *>(key), k_len);
     PutFixed32(&buf_, v_len);
     buf_.append(reinterpret_cast<const char *>(value), v_len);
+    spdlog::debug("buf size: {}", buf_.size());
+    memcpy(entries, buf_.data(), buf_.size());
     cur_entries_ += 1;
+    entry_tail_ += buf_.size();
   }
   SetIsDirty(true);
   writeHeader();
@@ -50,6 +53,8 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   // must
   auto entries_start = EntryPosStart();
   spdlog::info("entries_offset: {}", reinterpret_cast<char *>(entries_start) - GetData());
+  entry_tail_ = reinterpret_cast<char *>(entries_start) - GetData();
+
   printf("entries_start %p\n", entries_start + 1);
   printf("data_ %p\n", GetData() + 1990);
 
@@ -60,8 +65,12 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
     entry.key = reinterpret_cast<byte *>(entries_start + 5);
     spdlog::info("key_len: {}", entry.key_len);
     spdlog::info("key: {}", std::string(reinterpret_cast<char *>(entry.key), entry.key_len));
-    entry.value_len = DecodeFixed32(reinterpret_cast<const char*>(entries_start[5 + entry.key_len]));
-    entry.value = reinterpret_cast<byte *>(entries_start[9 + entry.key_len]);
+    entry.value_len = DecodeFixed32(reinterpret_cast<const char*>(entries_start + 5 + entry.key_len));
+    entry.value = reinterpret_cast<byte *>(entries_start + 9 + entry.key_len);
+    spdlog::info("value_len: {}", entry.value_len);
+    spdlog::info("value: {}", std::string(reinterpret_cast<char *>(entry.value), entry.value_len));
+    entries_.push_back(entry);
+    entry_tail_ += entry.size();
   }
 }
 
@@ -92,6 +101,8 @@ size_t BTreeNodePage::available() {
   }
   return sz;
 }
+
+
 
 
 

@@ -19,6 +19,7 @@ struct Entry {
   byte* key;
   uint32_t value_len;
   byte* value;
+  inline size_t size() { return 9 + key_len + value_len; }
 };
 
 // 继承page
@@ -51,7 +52,9 @@ class BTreeNodePage;
 class YedisInstance;
 class BTree {
  public:
-  BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {};
+  BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {
+    init();
+  };
   Status init();
   Status add(const Slice &key, const Slice &value);
   Status destroy();

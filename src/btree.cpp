@@ -35,4 +35,5 @@ Status BTree::destroy() {
   yedis_instance_->disk_manager->Destroy();
   return Status::OK();
 }
+
 }
