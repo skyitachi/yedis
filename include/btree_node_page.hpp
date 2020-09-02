@@ -61,6 +61,8 @@ class BTreeNodePage: public Page {
   std::vector<Entry> entries_;
   // entry tail
   size_t entry_tail_;
+
+  int64_t* key_pos_ptr_;
   // TODO: value page cnt
   int value_page_cnt_;
   // TODO: value page should be allocated by buffer_pool_manger

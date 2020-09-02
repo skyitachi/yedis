@@ -10,8 +10,6 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   if (IsLeafNode()) {
     upper_bound(key);
     auto entries = GetData() + entry_tail_;
-    printf("entry start address: %p\n", entries);
-    printf("data start address: %p\n", GetData());
     spdlog::debug("entry offset: {}", reinterpret_cast<char*>(entries) - GetData());
     // write value
     buf_.resize(0);
@@ -20,10 +18,17 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
     buf_.append(reinterpret_cast<const char *>(key), k_len);
     PutFixed32(&buf_, v_len);
     buf_.append(reinterpret_cast<const char *>(value), v_len);
-    spdlog::debug("buf size: {}", buf_.size());
     memcpy(entries, buf_.data(), buf_.size());
     cur_entries_ += 1;
+    // write entry
+    Entry entry{};
+    entry.flag = 0;
+    entry.key_len = k_len;
+    entry.key = reinterpret_cast<byte *>(entries + 5);
+    entry.value_len = v_len;
+    entry.value = reinterpret_cast<byte *>(entries + 9 + k_len);
     entry_tail_ += buf_.size();
+    entries_.push_back(entry);
   }
   SetIsDirty(true);
   writeHeader();
@@ -49,17 +54,16 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   spdlog::info("cur_entries from file: {}", GetCurrentEntries());
   page_id_ = page_id;
   spdlog::info("page_id from file: {}", GetPageID());
+  // TODO: read key_post_ptr_
+  key_pos_ptr_ = new int64_t[t_];
   // read entries
   // must
   auto entries_start = EntryPosStart();
   spdlog::info("entries_offset: {}", reinterpret_cast<char *>(entries_start) - GetData());
   entry_tail_ = reinterpret_cast<char *>(entries_start) - GetData();
 
-  printf("entries_start %p\n", entries_start + 1);
-  printf("data_ %p\n", GetData() + 1990);
-
   for (int i = 0; i < cur_entries_; i++) {
-    Entry entry;
+    Entry entry{};
     entry.flag = reinterpret_cast<byte>(entries_start[0]);
     entry.key_len = DecodeFixed32(reinterpret_cast<const char *>(entries_start + 1));
     entry.key = reinterpret_cast<byte *>(entries_start + 5);
@@ -74,22 +78,30 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   }
 }
 
+// TODO: start[i] error
 int BTreeNodePage::upper_bound(const byte *key) {
-  auto cur_entries = GetCurrentEntries();
-  auto start = KeyPosStart();
+  auto start = key_pos_ptr_;
   int i;
-  for(i = cur_entries - 1; i >= 0; i--) {
-    auto offset = start[i];
+  spdlog::info("current entries {}", cur_entries_);
+  for (int k = 0; k < cur_entries_; k++) {
+    spdlog::info("current key_pos: {}", start[k]);
+  }
+  for(i = cur_entries_ - 1; i >= 0; i--) {
+    auto offset = *(start + i);
+    assert(offset < entries_.size());
+    spdlog::info("offset = {}, entries length: {}", offset, entries_.size());
     auto target_key = entries_[offset].key;
     if (memcmp(key, target_key, entries_[offset].key_len) >= 0) {
       break;
     }
+    spdlog::debug("start[{}] = {}", i, start[i]);
     start[i + 1] = start[i];
   }
   if (i == -1) {
     i = 0;
   }
-  start[i] = cur_entries;
+  start[i] = cur_entries_;
+  spdlog::debug("start[{}] = {}", i, start[i]);
   return i;
 }
 
