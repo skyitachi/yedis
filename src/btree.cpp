@@ -14,6 +14,10 @@ Status BTree::add(const Slice &key, const Slice& value) {
             reinterpret_cast<const byte*>(value.data()), value.size());
 }
 
+Status BTree::read(const Slice &key, std::string *value) {
+  return root->read(reinterpret_cast<const byte*>(key.data()), value);
+}
+
 Status BTree::init() {
   page_id_t root_page_id;
   root = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&root_page_id));

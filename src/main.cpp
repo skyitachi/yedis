@@ -23,10 +23,19 @@ int main() {
   yInstance->buffer_pool_manager = buffer_pool_manager;
   auto zsetIndexTree = new yedis::BTree(yInstance);
 
+//  for (int i = 0; i < 10; i++) {
+//    std::string k = "k";
+//    std::string v = "v";
+//    zsetIndexTree->add(k + std::to_string(i), v + std::to_string(i));
+//  }
+
+  // test for read
   for (int i = 0; i < 10; i++) {
     std::string k = "k";
-    std::string v = "v";
-    zsetIndexTree->add(k + std::to_string(i), v + std::to_string(i));
+    std::string v;
+    auto s = zsetIndexTree->read(k + std::to_string(i), &v);
+    assert(s.ok());
+    spdlog::info("found key={}, value={}", k + std::to_string(i), v);
   }
   yInstance->buffer_pool_manager->Flush();
 

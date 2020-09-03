@@ -10,7 +10,6 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   if (IsLeafNode()) {
     upper_bound(key);
     auto entries = GetData() + entry_tail_;
-    spdlog::debug("entry offset: {}", reinterpret_cast<char*>(entries) - GetData());
     // write value
     buf_.resize(0);
     PutByte(&buf_, 0);
@@ -18,6 +17,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
     buf_.append(reinterpret_cast<const char *>(key), k_len);
     PutFixed32(&buf_, v_len);
     buf_.append(reinterpret_cast<const char *>(value), v_len);
+    // step 1: write to page data
     memcpy(entries, buf_.data(), buf_.size());
     cur_entries_ += 1;
     // write entry
@@ -31,8 +31,24 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
     entries_.push_back(entry);
   }
   SetIsDirty(true);
+  // step 2: update header
   writeHeader();
+  // step 3: update key pos
+  memcpy(KeyPosStart(), reinterpret_cast<byte*>(key_pos_ptr_), sizeof(int64_t) * t_);
   return Status::OK();
+}
+
+Status BTreeNodePage::read(const byte *key, std::string *result) {
+  for (int i = 0; i < cur_entries_; i++) {
+    auto off = key_pos_ptr_[i];
+    assert(off < entries_.size());
+    if (memcmp(key, entries_[off].key, entries_[off].key_len) == 0) {
+      result->append(reinterpret_cast<const char*>(entries_[off].value), entries_[off].value_len);
+      return Status::OK();
+    }
+  }
+  spdlog::debug("not found key={}", key);
+  return Status::NotFound();
 }
 
 void BTreeNodePage::writeHeader() {
@@ -49,11 +65,8 @@ void BTreeNodePage::writeHeader() {
 
 void BTreeNodePage::init(int degree, page_id_t page_id) {
   t_ = degree;
-  spdlog::info("degree from file: {}", GetDegree());
   cur_entries_ = GetCurrentEntries();
-  spdlog::info("cur_entries from file: {}", GetCurrentEntries());
   page_id_ = page_id;
-  spdlog::info("page_id from file: {}", GetPageID());
   // TODO: read key_post_ptr_
   key_pos_ptr_ = new int64_t[t_];
   // read entries
@@ -75,6 +88,7 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
     spdlog::info("value: {}", std::string(reinterpret_cast<char *>(entry.value), entry.value_len));
     entries_.push_back(entry);
     entry_tail_ += entry.size();
+    entries_start += entry.size();
   }
 }
 
@@ -113,9 +127,6 @@ size_t BTreeNodePage::available() {
   }
   return sz;
 }
-
-
-
 
 
 }

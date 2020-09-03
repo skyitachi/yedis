@@ -57,6 +57,7 @@ class BTree {
   };
   Status init();
   Status add(const Slice &key, const Slice &value);
+  Status read(const Slice &key, std::string *value);
   Status destroy();
  private:
   BTreeNodePage * root;
