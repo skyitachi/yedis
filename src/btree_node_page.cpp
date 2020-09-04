@@ -4,6 +4,8 @@
 #include <spdlog/spdlog.h>
 
 #include "btree_node_page.hpp"
+
+#include <spdlog/fmt/bin_to_hex.h>
 namespace yedis {
 
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len) {
@@ -47,32 +49,27 @@ Status BTreeNodePage::read(const byte *key, std::string *result) {
       return Status::OK();
     }
   }
-  spdlog::debug("not found key={}", key);
   return Status::NotFound();
 }
 
 void BTreeNodePage::writeHeader() {
-  spdlog::debug("before write page_id");
   memcpy(GetData(), reinterpret_cast<char *>(&page_id_), sizeof(page_id_t));
-  spdlog::debug("after write page_id: {}", page_id_);
-
   memcpy(GetData() + ENTRY_COUNT_OFFSET, reinterpret_cast<char *>(&cur_entries_), sizeof(int));
-  spdlog::debug("after write entry count: {}", cur_entries_);
-
   memcpy(GetData() + DEGREE_OFFSET, reinterpret_cast<char*>(&t_), sizeof(int));
-  spdlog::debug("after write degree: {}", t_);
 }
 
 void BTreeNodePage::init(int degree, page_id_t page_id) {
   t_ = degree;
   cur_entries_ = GetCurrentEntries();
   page_id_ = page_id;
-  // TODO: read key_post_ptr_
+
+  // init key_pos array
   key_pos_ptr_ = new int64_t[t_];
+  memcpy(key_pos_ptr_, KeyPosStart(), sizeof(int64_t) * t_);
+
   // read entries
   // must
   auto entries_start = EntryPosStart();
-  spdlog::info("entries_offset: {}", reinterpret_cast<char *>(entries_start) - GetData());
   entry_tail_ = reinterpret_cast<char *>(entries_start) - GetData();
 
   for (int i = 0; i < cur_entries_; i++) {
@@ -80,26 +77,17 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
     entry.flag = reinterpret_cast<byte>(entries_start[0]);
     entry.key_len = DecodeFixed32(reinterpret_cast<const char *>(entries_start + 1));
     entry.key = reinterpret_cast<byte *>(entries_start + 5);
-    spdlog::info("key_len: {}", entry.key_len);
-    spdlog::info("key: {}", std::string(reinterpret_cast<char *>(entry.key), entry.key_len));
     entry.value_len = DecodeFixed32(reinterpret_cast<const char*>(entries_start + 5 + entry.key_len));
     entry.value = reinterpret_cast<byte *>(entries_start + 9 + entry.key_len);
-    spdlog::info("value_len: {}", entry.value_len);
-    spdlog::info("value: {}", std::string(reinterpret_cast<char *>(entry.value), entry.value_len));
     entries_.push_back(entry);
     entry_tail_ += entry.size();
     entries_start += entry.size();
   }
 }
 
-// TODO: start[i] error
 int BTreeNodePage::upper_bound(const byte *key) {
   auto start = key_pos_ptr_;
   int i;
-  spdlog::info("current entries {}", cur_entries_);
-  for (int k = 0; k < cur_entries_; k++) {
-    spdlog::info("current key_pos: {}", start[k]);
-  }
   for(i = cur_entries_ - 1; i >= 0; i--) {
     auto offset = *(start + i);
     assert(offset < entries_.size());
