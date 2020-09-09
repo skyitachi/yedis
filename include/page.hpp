@@ -17,6 +17,9 @@ namespace yedis {
     inline char *GetData() { return data_; }
 
     inline bool IsDirty() { return is_dirty_; }
+
+//    virtual char *GetAndFlushData() { return data_; }
+
     void SetIsDirty(bool is_dirty) {
       is_dirty_ = is_dirty;
     }

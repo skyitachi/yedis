@@ -33,8 +33,8 @@ class BTreeNodePage: public Page {
     return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
   }
   // key pos start
-  inline int64_t* KeyPosStart() {
-    return reinterpret_cast<int64_t*>(GetData() + KEY_POS_OFFSET);
+  inline byte* KeyPosStart() {
+    return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET);
   }
   // child pos start
   inline int64_t* ChildPosStart() {
@@ -48,8 +48,10 @@ class BTreeNodePage: public Page {
   }
   //
   Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
+  Status read(const byte *key, std::string *result);
 
   void init(int degree, page_id_t page_id);
+
 
  private:
   void writeHeader();
@@ -57,6 +59,7 @@ class BTreeNodePage: public Page {
   int upper_bound(const byte *key);
   int t_;
   int cur_entries_;
+  // entry buffer
   std::string buf_;
   std::vector<Entry> entries_;
   // entry tail
