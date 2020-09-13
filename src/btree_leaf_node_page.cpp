@@ -3,12 +3,17 @@
 //
 #include <spdlog/spdlog.h>
 
-#include "btree_node_page.hpp"
+#include "btree_leaf_node_page.hpp"
 
 #include <spdlog/fmt/bin_to_hex.h>
 namespace yedis {
 
-Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len) {
+Status BTreeLeafNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len) {
+  // 没有多余的空间，需要分裂
+  if (available() < v_len + k_len + 8) {
+    // 没有空间了
+    return Status::NoSpace();
+  }
   if (IsLeafNode()) {
     upper_bound(key);
     auto entries = GetData() + entry_tail_;
@@ -40,7 +45,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   return Status::OK();
 }
 
-Status BTreeNodePage::read(const byte *key, std::string *result) {
+Status BTreeLeafNodePage::read(const byte *key, std::string *result) {
   for (int i = 0; i < cur_entries_; i++) {
     auto off = key_pos_ptr_[i];
     assert(off < entries_.size());
@@ -52,13 +57,13 @@ Status BTreeNodePage::read(const byte *key, std::string *result) {
   return Status::NotFound();
 }
 
-void BTreeNodePage::writeHeader() {
+void BTreeLeafNodePage::writeHeader() {
   memcpy(GetData(), reinterpret_cast<char *>(&page_id_), sizeof(page_id_t));
   memcpy(GetData() + ENTRY_COUNT_OFFSET, reinterpret_cast<char *>(&cur_entries_), sizeof(int));
   memcpy(GetData() + DEGREE_OFFSET, reinterpret_cast<char*>(&t_), sizeof(int));
 }
 
-void BTreeNodePage::init(int degree, page_id_t page_id) {
+void BTreeLeafNodePage::init(int degree, page_id_t page_id) {
   t_ = degree;
   cur_entries_ = GetCurrentEntries();
   page_id_ = page_id;
@@ -85,7 +90,7 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   }
 }
 
-int BTreeNodePage::upper_bound(const byte *key) {
+int BTreeLeafNodePage::upper_bound(const byte *key) {
   auto start = key_pos_ptr_;
   int i;
   for(i = cur_entries_ - 1; i >= 0; i--) {
@@ -107,13 +112,8 @@ int BTreeNodePage::upper_bound(const byte *key) {
   return i;
 }
 
-size_t BTreeNodePage::available() {
-  auto n_entries = GetCurrentEntries();
-  auto sz = 0;
-  for(int i = 0; i < n_entries; i++) {
-    sz += entries_[i].key_len + entries_[i].value_len + sizeof(uint32_t) * 2 + sizeof(byte);
-  }
-  return sz;
+size_t BTreeLeafNodePage::available() {
+  return PAGE_SIZE - entry_tail_;
 }
 
 

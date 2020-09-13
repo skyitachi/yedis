@@ -48,7 +48,9 @@ class BTreeNode {
     // Page
 };
 
-class BTreeNodePage;
+class BTreeLeafNodePage;
+class BTreeMetaPage;
+class BTreeIndexNodePage;
 class YedisInstance;
 class BTree {
  public:
@@ -60,7 +62,9 @@ class BTree {
   Status read(const Slice &key, std::string *value);
   Status destroy();
  private:
-  BTreeNodePage * root;
+  BTreeMetaPage* meta_;
+  BTreeLeafNodePage * leaf_root_;
+  BTreeIndexNodePage* index_root_;
   std::string file_name_;
   YedisInstance* yedis_instance_;
 };

@@ -2,8 +2,8 @@
 // Created by skyitachi on 2020/8/22.
 //
 
-#ifndef YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_
-#define YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_
+#ifndef YEDIS_INCLUDE_BTREE_LEAF_NODE_PAGE_HPP_
+#define YEDIS_INCLUDE_BTREE_LEAF_NODE_PAGE_HPP_
 
 #include <unordered_map>
 
@@ -17,7 +17,7 @@ namespace yedis {
  * header:
  * 4 byte(page_id) + 4 byte(entries count) + 4 byte(degree) + 1 byte(flag)
  */
-class BTreeNodePage: public Page {
+class BTreeLeafNodePage: public Page {
 
  public:
   // page_id
@@ -73,4 +73,4 @@ class BTreeNodePage: public Page {
 
 };
 }
-#endif //YEDIS_INCLUDE_BTREE_NODE_PAGE_HPP_
+#endif //YEDIS_INCLUDE_BTREE_LEAF_NODE_PAGE_HPP_
