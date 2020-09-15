@@ -14,3 +14,9 @@ yet another rocksdb based redis, let's call it `yedis`
 #### TODO
 - [ ] 处理分裂如何记住当前需要分裂节点的位子
 - [ ] 是否要记住当前page的父节点
+- [ ] 实现search
+- [ ] leaf node需要前后指针
+
+#### 分裂算法
+- 算法导论的分裂算法是在搜索路径中出现满节点的就开始分裂, 用来维护btree的平衡
+- 算法４里是递归更新（从底向上分裂）
