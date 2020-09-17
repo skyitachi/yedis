@@ -6,24 +6,13 @@
 #define YEDIS_INCLUDE_BTREE_INDEX_NODE_PAGE_HPP_
 
 #include "btree.hpp"
-#include "page.hpp"
+#include "btree_node_page.h"
+#include <tuple>
 
 namespace yedis {
 
-class BTreeIndexNodePage: public Page {
+class BTreeIndexNodePage: public BTreeNodePage {
  public:
-  // page_id
-  inline page_id_t GetPageID() {
-    return *reinterpret_cast<page_id_t*>(GetData());
-  }
-  // n_current_entry_
-  inline int GetCurrentEntries() { return *reinterpret_cast<int *>(GetData() + ENTRY_COUNT_OFFSET); }
-  // degree t
-  inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
-  // is leaf node
-  inline bool IsLeafNode() {
-    return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
-  }
   // key pos start
   inline byte* KeyPosStart() {
     return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET);
@@ -33,8 +22,15 @@ class BTreeIndexNodePage: public Page {
     return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
   }
 
- private:
+  page_id_t search(const byte* key, size_t k_len);
 
+  // 初始化keys数组
+  // 或者说如何让底层数据直接以iterator的形式访问
+  void init(int degree, page_id_t page_id) override;
+
+ private:
+  typedef std::tuple<byte*, size_t> Byte;
+  std::vector<Byte> keys_;
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_INDEX_NODE_PAGE_HPP_

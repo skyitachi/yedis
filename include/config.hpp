@@ -43,7 +43,8 @@ static constexpr int MAX_DEGREE = PAGE_SIZE / 2 / 33;
 static constexpr int ENTRY_COUNT_OFFSET = 4;
 static constexpr int DEGREE_OFFSET = 8;
 static constexpr int FLAG_OFFSET = 12;
-static constexpr int KEY_POS_OFFSET = 13;
+static constexpr int PARENT_OFFSET = 13;
+static constexpr int KEY_POS_OFFSET = 17;
 static constexpr int ENTRY_OFFSET =  KEY_POS_OFFSET + (4 * MAX_DEGREE - 1) * sizeof(uint32_t);
 
 }

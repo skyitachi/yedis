@@ -9,6 +9,7 @@
 
 #include "btree.hpp"
 #include "page.hpp"
+#include "btree_node_page.h"
 
 
 namespace yedis {
@@ -17,21 +18,9 @@ namespace yedis {
  * header:
  * 4 byte(page_id) + 4 byte(entries count) + 4 byte(degree) + 1 byte(flag)
  */
-class BTreeLeafNodePage: public Page {
+class BTreeLeafNodePage: public BTreeNodePage {
 
  public:
-  // page_id
-  inline page_id_t GetPageID() {
-    return *reinterpret_cast<page_id_t*>(GetData());
-  }
-  // n_current_entry_
-  inline int GetCurrentEntries() { return *reinterpret_cast<int *>(GetData() + ENTRY_COUNT_OFFSET); }
-  // degree t
-  inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
-  // is leaf node
-  inline bool IsLeafNode() {
-    return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
-  }
   // key pos start
   inline byte* KeyPosStart() {
     return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET);
@@ -47,10 +36,10 @@ class BTreeLeafNodePage: public Page {
     return reinterpret_cast<byte*>(entryStart);
   }
   //
-  Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
-  Status read(const byte *key, std::string *result);
+  Status add(const byte *key, size_t k_len, const byte *value, size_t v_len) override;
+  Status read(const byte *key, std::string *result) override;
 
-  void init(int degree, page_id_t page_id);
+  void init(int degree, page_id_t page_id) override;
 
 
  private:

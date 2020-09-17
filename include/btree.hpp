@@ -51,6 +51,7 @@ class BTreeNode {
 class BTreeLeafNodePage;
 class BTreeMetaPage;
 class BTreeIndexNodePage;
+class BTreeNodePage;
 class YedisInstance;
 class BTree {
  public:
@@ -65,6 +66,7 @@ class BTree {
   BTreeMetaPage* meta_;
   BTreeLeafNodePage * leaf_root_;
   BTreeIndexNodePage* index_root_;
+  BTreeNodePage *root_;
   std::string file_name_;
   YedisInstance* yedis_instance_;
 };

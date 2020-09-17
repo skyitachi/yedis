@@ -12,18 +12,26 @@
 namespace yedis {
 
 Status BTree::add(const Slice &key, const Slice& value) {
-  if (index_root_ != nullptr) {
+  if (root_ != nullptr) {
     // 判断应该在哪个叶子节点上
   }
-  auto s = leaf_root_->add(reinterpret_cast<const byte*>(key.data()), key.size(),
-                         reinterpret_cast<const byte*>(value.data()), value.size());
+  Status s;
+  if (root_->IsLeafNode()) {
+    auto leaf_root = reinterpret_cast<BTreeLeafNodePage*>(root_);
+    s = leaf_root->add(reinterpret_cast<const byte*>(key.data()), key.size(),
+                   reinterpret_cast<const byte*>(value.data()), value.size());
+  } else {
+    auto index_root = reinterpret_cast<BTreeIndexNodePage*>(root_);
+    s = index_root->add(reinterpret_cast<const byte*>(key.data()), key.size(),
+                   reinterpret_cast<const byte*>(value.data()), value.size());
+  }
   if (s.IsNoSpace()) {
     // 处理分裂
   }
 }
 
 Status BTree::read(const Slice &key, std::string *value) {
-  return leaf_root_->read(reinterpret_cast<const byte*>(key.data()), value);
+  return root_->read(reinterpret_cast<const byte*>(key.data()), value);
 }
 
 Status BTree::init() {
@@ -32,25 +40,21 @@ Status BTree::init() {
   meta_ = reinterpret_cast<BTreeMetaPage*>(yedis_instance_->buffer_pool_manager->NewPage(&meta_page_id));
 
   auto levels = meta_->GetLevels();
-  auto root_page_id_ = meta_->GetRootPageId();
-  if (levels > 1) {
-    index_root_ = reinterpret_cast<BTreeIndexNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(root_page_id_));
-    spdlog::info("tree degree {}", leaf_root_->GetDegree());
-    spdlog::info("current root node is index node");
-  } else {
-    page_id_t root_page_id;
-    leaf_root_ = reinterpret_cast<BTreeLeafNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&root_page_id));
-    if (root_page_id != leaf_root_->GetPageID()) {
+  auto root_page_id = meta_->GetRootPageId();
+  // TODO
+  root_ = static_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(root_page_id));
+  if (levels == 1) {
+    if (root_page_id != root_->GetPageID()) {
       spdlog::error("open btree failed due to non zero root page id {}", leaf_root_->GetPageID());
     }
-    if (leaf_root_->GetDegree() == 0) {
-      leaf_root_->init(MAX_DEGREE, root_page_id);
+    if (root_->GetDegree() == 0) {
+      root_->init(MAX_DEGREE, root_page_id);
     } else {
-      leaf_root_->init(leaf_root_->GetDegree(), root_page_id);
+      root_->init(root_->GetDegree(), root_page_id);
     }
   }
 
-  spdlog::info("open btree successfully with page_id {}", root_page_id_);
+  spdlog::info("open btree successfully with page_id {}", root_page_id);
 
   return Status::OK();
 }
