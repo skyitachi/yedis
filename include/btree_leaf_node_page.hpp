@@ -39,7 +39,7 @@ class BTreeLeafNodePage: public BTreeNodePage {
   Status add(const byte *key, size_t k_len, const byte *value, size_t v_len) override;
   Status read(const byte *key, std::string *result) override;
 
-  void init(int degree, page_id_t page_id) override;
+  void init(int degree, page_id_t page_id);
 
 
  private:

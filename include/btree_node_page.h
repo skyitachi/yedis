@@ -32,6 +32,7 @@ namespace yedis {
     virtual Status read(const byte *key, std::string *result);
 
     virtual void init(int degree, page_id_t page_id);
+   private:
 
   };
 }
