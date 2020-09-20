@@ -14,8 +14,8 @@ namespace yedis {
 class BTreeIndexNodePage: public BTreeNodePage {
  public:
   // key pos start
-  inline byte* KeyPosStart() {
-    return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET);
+  inline int64_t *KeyPosStart() {
+    return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
   }
   // child pos start
   inline byte* ChildPosStart() {
@@ -23,6 +23,7 @@ class BTreeIndexNodePage: public BTreeNodePage {
   }
 
   page_id_t search(const byte* key, size_t k_len);
+  std::tuple<page_id_t, page_id_t> search(int64_t key);
 
   // 初始化keys数组
   // 或者说如何让底层数据直接以iterator的形式访问
