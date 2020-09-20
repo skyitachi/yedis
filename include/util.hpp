@@ -23,6 +23,20 @@ inline uint32_t DecodeFixed32(const char* ptr) {
   return result;
 }
 
+//　default little endian
+inline void EncodeFixed64(char *dst, uint64_t value) {
+  uint8_t *const buffer = reinterpret_cast<uint8_t*>(dst);
+  std::memcpy(buffer, &value, sizeof(uint64_t));
+}
+
+inline uint64_t DecodeFixed64(const char* ptr) {
+  const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
+
+  uint64_t result;
+  std::memcpy(&result, buffer, sizeof(uint64_t));
+  return result;
+}
+
 inline void PutFixed32(std::string* dst, uint32_t value) {
   char buf[sizeof(value)];
   EncodeFixed32(buf, value);

@@ -46,8 +46,16 @@ namespace yedis {
     inline page_id_t GetParentPageID() {
       return *reinterpret_cast<page_id_t*>(GetData() + PARENT_OFFSET);
     }
+
+    inline int64_t* KeyPosStart() {
+      return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
+    }
+
+    inline page_id_t * ChildPosStart() {
+      return reinterpret_cast<page_id_t *>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(page_id_t));
+    }
     // interface
-    virtual Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
+    virtual Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
     virtual Status read(const byte *key, std::string *result);
 
     page_id_t search(int64_t key, const byte* value, size_t v_len);
@@ -66,10 +74,11 @@ namespace yedis {
       bool operator != (const EntryIterator& iter) const;
       EntryIterator& operator ++();
       EntryIterator& operator ++(int);
+      int64_t key() const;
       char *data_;
     };
     BTreeNodePage* NewLeafPage(int cnt, const EntryIterator& start, const EntryIterator& end);
-    BTreeNodePage* NewIndexPage(int cnt, const EntryIterator& start, const EntryIterator& end);
+    BTreeNodePage* NewIndexPage(int cnt, int64_t key, page_id_t left,  page_id_t right);
 
    private:
     YedisInstance* yedis_instance_;
@@ -77,7 +86,8 @@ namespace yedis {
       return PAGE_SIZE - entry_tail_;
     }
     void index_split();
-    BTreeNodePage* leaf_split();
+    BTreeNodePage* leaf_split(BTreeNodePage* parent, int child_idx);
+    void index_node_add_child(int pos, int64_t key, page_id_t child);
     // entry tail
     size_t entry_tail_;
     // degree
