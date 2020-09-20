@@ -3,6 +3,7 @@
 //
 
 #include <btree_index_node_page.hpp>
+#include <algorithm>
 
 namespace yedis {
   page_id_t BTreeIndexNodePage::search(const byte *key, size_t k_len) {
@@ -11,23 +12,23 @@ namespace yedis {
     return INVALID_PAGE_ID;
   }
 
-  std::tuple<page_id_t, page_id_t> BTreeIndexNodePage::search(int64_t key) {
+  std::vector<page_id_t> BTreeIndexNodePage::search(int64_t key) {
     int64_t* key_start = KeyPosStart();
     int n_keys = GetCurrentEntries();
-    int l = 0, h = n_keys;
-    while(l < h) {
-      int m = l + (h - l) / 2;
-      if (key_start[m] >= key) {
-        h = m;
-      } else {
-        l = m + 1;
-      }
+    auto child_start = ChildPosStart();
+    auto key_end = key_start + n_keys;
+    auto first = std::lower_bound(key_start, key_end, key);
+    auto ret = std::vector<page_id_t>();
+    if (first == key_end) {
+      // key is smallest
+      ret.push_back(child_start[0]);
+      return ret;
     }
-    h = l;
-    if (key_start[l] == key) {
-      for (; h < n_keys && key_start[h] == key; h++);
+    auto second = std::upper_bound(first, key_end, key);
+    for (auto it = first; it != second; it++) {
+      ret.push_back(child_start[it - key_start]);
     }
-    return std::make_tuple(l, h);
+    return ret;
   }
 
 }

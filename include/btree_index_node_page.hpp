@@ -18,12 +18,12 @@ class BTreeIndexNodePage: public BTreeNodePage {
     return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
   }
   // child pos start
-  inline byte* ChildPosStart() {
-    return reinterpret_cast<byte*>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
+  inline page_id_t * ChildPosStart() {
+    return reinterpret_cast<page_id_t *>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
   }
 
   page_id_t search(const byte* key, size_t k_len);
-  std::tuple<page_id_t, page_id_t> search(int64_t key);
+  std::vector<page_id_t> search(int64_t key);
 
   // 初始化keys数组
   // 或者说如何让底层数据直接以iterator的形式访问

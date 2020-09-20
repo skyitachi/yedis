@@ -37,7 +37,7 @@ using lsn_t = int32_t;         // log sequence number type
 using slot_offset_t = size_t;  // slot offset type
 using oid_t = uint16_t;
 
-static constexpr int MAX_DEGREE = PAGE_SIZE / 2 / 33;
+static constexpr int MAX_DEGREE = (PAGE_SIZE - 32) / 8;
 
 // page format
 static constexpr int ENTRY_COUNT_OFFSET = 4;
