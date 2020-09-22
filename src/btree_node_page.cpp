@@ -23,12 +23,32 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   }
 }
 
-// 搜索改key对应的leaf node
-page_id_t BTreeNodePage::search(int64_t key, const byte *value, size_t v_len) {
+// 搜索改key对应的leaf node, 默认是从根结点向下搜索
+// NOTE: 暂时只考虑不重复key的情况
+page_id_t BTreeNodePage::search(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   auto cur = this;
   if (cur->IsLeafNode()) {
     if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(size_t))) {
       // TODO: split
+      auto new_root = leaf_split(nullptr, -1);
+      if (root != nullptr && *root != nullptr) {
+        //　update root
+        *root = new_root;
+      }
+      // 此时root只有一个结点
+      if (key < new_root->GetKey(0)) {
+        return new_root->GetChild(0);
+      }
+      return new_root->GetChild(1);
+    }
+    // leaf node没有满直接返回
+    return GetPageID();
+  }
+  // 非叶子结点
+  auto it = this;
+  while(!it->IsLeafNode()) {
+    if (it->IsFull()) {
+      // TODO: index_split
     }
   }
 }
@@ -65,7 +85,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BTreeNodePage* parent, int child_idx) {
   // parent添加child
   parent->index_node_add_child(child_idx, mid_key, new_leaf_page->GetPageID());
 
-  return this;
+  return nullptr;
 }
 
 BTreeNodePage* BTreeNodePage::NewLeafPage(int cnt, const EntryIterator &start, const EntryIterator &end) {

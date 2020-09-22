@@ -36,7 +36,7 @@ namespace yedis {
         *(GetData() + FLAG_OFFSET) = 1;
       }
     }
-    inline bool IsFull(size_t sz) {
+    inline bool IsFull(size_t sz = 0) {
       if (!IsLeafNode()) {
         return GetDegree() == MAX_DEGREE;
       }
@@ -50,15 +50,25 @@ namespace yedis {
     inline int64_t* KeyPosStart() {
       return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
     }
+    inline int64_t GetKey(int idx) {
+      assert(idx < GetCurrentEntries());
+      return KeyPosStart()[idx];
+    }
 
     inline page_id_t * ChildPosStart() {
       return reinterpret_cast<page_id_t *>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(page_id_t));
+    }
+
+    inline page_id_t GetChild(int idx) {
+      // NOTE: len(children) = len(entries) + 1
+      assert(idx <= GetCurrentEntries());
+      return ChildPosStart()[idx];
     }
     // interface
     virtual Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
     virtual Status read(const byte *key, std::string *result);
 
-    page_id_t search(int64_t key, const byte* value, size_t v_len);
+    page_id_t search(int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
 
     virtual void init(int degree, page_id_t page_id);
     void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
