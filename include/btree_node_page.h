@@ -89,13 +89,15 @@ namespace yedis {
     };
     BTreeNodePage* NewLeafPage(int cnt, const EntryIterator& start, const EntryIterator& end);
     BTreeNodePage* NewIndexPage(int cnt, int64_t key, page_id_t left,  page_id_t right);
+    // 迁移start到末尾的key和child到新的index page上
+    BTreeNodePage* NewIndexPageFrom(BTreeNodePage* src, int start);
 
    private:
     YedisInstance* yedis_instance_;
     size_t available() {
       return PAGE_SIZE - entry_tail_;
     }
-    void index_split();
+    BTreeNodePage* index_split(BTreeNodePage* parent, int child_idx);
     BTreeNodePage* leaf_split(BTreeNodePage* parent, int child_idx);
     void index_node_add_child(int pos, int64_t key, page_id_t child);
     // entry tail

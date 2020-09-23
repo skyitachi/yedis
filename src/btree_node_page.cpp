@@ -27,11 +27,12 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 // NOTE: 暂时只考虑不重复key的情况
 page_id_t BTreeNodePage::search(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   auto cur = this;
+  assert(root != nullptr);
   if (cur->IsLeafNode()) {
     if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(size_t))) {
       // TODO: split
       auto new_root = leaf_split(nullptr, -1);
-      if (root != nullptr && *root != nullptr) {
+      if (*root != nullptr) {
         //　update root
         *root = new_root;
       }
@@ -49,12 +50,31 @@ page_id_t BTreeNodePage::search(int64_t key, const byte *value, size_t v_len, BT
   while(!it->IsLeafNode()) {
     if (it->IsFull()) {
       // TODO: index_split
+      if (*root == this) {
+        // 当前index node就是根节点
+        auto new_root = index_split(nullptr, 0);
+        *root = new_root;
+      } else {
+        // TODO: 这里要记住parent的信息，包括在parent中的index
+      }
     }
   }
 }
 
-void BTreeNodePage::index_split() {
-
+// 返回new root
+BTreeNodePage* BTreeNodePage::index_split(BTreeNodePage* parent, int child_idx) {
+  auto key_start = KeyPosStart();
+  int n_entries = GetCurrentEntries();
+  assert(n_entries >= 2);
+  auto mid_key  = key_start[n_entries / 2];
+  // 需要将right部分的数据迁移到新的index node上
+  auto new_index_page = NewIndexPageFrom(this, n_entries / 2 + 1);
+  if (parent == nullptr) {
+    auto new_root = NewIndexPage(1, mid_key, GetPageID(), new_index_page->GetPageID());
+    return new_root;
+  }
+  parent->index_node_add_child(child_idx, mid_key, new_index_page->GetPageID());
+  return nullptr;
 }
 
 // 返回new root
@@ -95,6 +115,7 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(int cnt, const EntryIterator &start, c
   leaf_init(next_page, cnt, new_page_id);
   // 复制内容
   memcpy(next_page->GetData(), start.data_, end.data_ - start.data_);
+  next_page->SetIsDirty(true);
   return next_page;
 }
 
@@ -112,6 +133,21 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(int cnt, int64_t key, page_id_t left,
   child_start[1] = right;
   next_page->SetIsDirty(true);
 
+}
+
+BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BTreeNodePage *src, int start) {
+  page_id_t page_id;
+  auto new_page = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&page_id));
+  auto cnt = src->GetCurrentEntries() - start;
+  new_page->SetCurrentEntries(cnt);
+  new_page->SetPageID(page_id);
+  // index_node需要设置degree
+  new_page->SetDegree(src->GetDegree());
+  // 复制key
+  memcpy(new_page->KeyPosStart(), src->KeyPosStart() + start, cnt);
+  // 复制child
+  memcpy(new_page->ChildPosStart(), src->KeyPosStart() + start - 1, cnt + 1);
+  new_page->SetIsDirty(true);
 }
 
 void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) {
