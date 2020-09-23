@@ -65,10 +65,11 @@ namespace yedis {
       return ChildPosStart()[idx];
     }
     // interface
-    virtual Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
+    Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
+    Status add(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
     virtual Status read(const byte *key, std::string *result);
 
-    page_id_t search(int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
+    BTreeNodePage * search(int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
 
     virtual void init(int degree, page_id_t page_id);
     void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
@@ -76,6 +77,8 @@ namespace yedis {
     inline void leaf_init(BTreeNodePage* dst, int n, page_id_t page_id) {
       return init(dst, 0, n, page_id, true);
     }
+    // insert kv pair to leaf node
+    Status leaf_insert(int64_t key, const byte* value, size_t v_len);
 
     class EntryIterator {
      public:

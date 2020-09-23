@@ -1,6 +1,8 @@
 //
 // Created by admin on 2020/9/18.
 //
+#include <spdlog/spdlog.h>
+
 #include <btree_node_page.h>
 #include <buffer_pool_manager.hpp>
 
@@ -18,47 +20,73 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
 }
 
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root) {
-  if (IsLeafNode()) {
-    auto index_node = reinterpret_cast<BTreeIndexNodePage*>(this);
-  }
+//  auto target_leaf_page = search()
+}
+
+Status BTreeNodePage::add(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
+  auto target_leaf_page = search(key, value, v_len, root);
+  spdlog::info("target_left_page: {}", target_leaf_page->GetPageID());
+  return target_leaf_page->leaf_insert(key, value, v_len);
 }
 
 // 搜索改key对应的leaf node, 默认是从根结点向下搜索
 // NOTE: 暂时只考虑不重复key的情况
-page_id_t BTreeNodePage::search(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
+BTreeNodePage * BTreeNodePage::search(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   auto cur = this;
   assert(root != nullptr);
   if (cur->IsLeafNode()) {
+    spdlog::debug("{} is leaf node", cur->GetPageID());
     if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(size_t))) {
-      // TODO: split
       auto new_root = leaf_split(nullptr, -1);
       if (*root != nullptr) {
+        spdlog::debug("root not null root page_id: {}", (*root)->GetPageID());
         //　update root
         *root = new_root;
       }
       // 此时root只有一个结点
       if (key < new_root->GetKey(0)) {
-        return new_root->GetChild(0);
+        return reinterpret_cast<BTreeNodePage*>(new_root->GetChild(0));
       }
-      return new_root->GetChild(1);
+      return reinterpret_cast<BTreeNodePage*>(new_root->GetChild(1));
     }
     // leaf node没有满直接返回
-    return GetPageID();
+    return this;
   }
   // 非叶子结点
   auto it = this;
+  BTreeNodePage* parent = nullptr;
+  int pos = -1;
   while(!it->IsLeafNode()) {
     if (it->IsFull()) {
-      // TODO: index_split
       if (*root == this) {
         // 当前index node就是根节点
         auto new_root = index_split(nullptr, 0);
         *root = new_root;
       } else {
-        // TODO: 这里要记住parent的信息，包括在parent中的index
+        assert(parent != nullptr && pos != -1);
+        index_split(parent, pos);
       }
     }
+    // ignore duplicate key
+    int64_t* key_start = KeyPosStart();
+    int n_keys = GetCurrentEntries();
+    auto child_start = ChildPosStart();
+    auto key_end = key_start + n_keys;
+    auto result = std::lower_bound(key_start, key_end, key);
+    parent = it;
+    if (result != key_end) {
+      // found
+      pos = result - key_start;
+      spdlog::debug("child pos: {}, child page_id: {}", pos, child_start[pos]);
+      it =  reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(child_start[pos]));
+    } else {
+      // key 最大
+      pos = n_keys;
+      it = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(child_start[pos]));
+    }
   }
+  // found leaf node
+  return it;
 }
 
 // 返回new root
@@ -106,6 +134,11 @@ BTreeNodePage* BTreeNodePage::leaf_split(BTreeNodePage* parent, int child_idx) {
   parent->index_node_add_child(child_idx, mid_key, new_leaf_page->GetPageID());
 
   return nullptr;
+}
+
+Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) {
+  // TODO: insert data in leaf node
+  return Status::NotSupported();
 }
 
 BTreeNodePage* BTreeNodePage::NewLeafPage(int cnt, const EntryIterator &start, const EntryIterator &end) {
