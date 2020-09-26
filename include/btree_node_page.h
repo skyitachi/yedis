@@ -9,15 +9,12 @@
 #include "btree.hpp"
 
 namespace yedis {
-  class YedisInstance;
+  class BufferPoolManager;
   class BTreeNodePage: public Page {
    public:
     // page_id
     inline page_id_t GetPageID() {
       return *reinterpret_cast<page_id_t*>(GetData());
-    }
-    inline void SetPageID(page_id_t page_id) {
-      return EncodeFixed32(GetData(), page_id);
     }
     // n_current_entry_
     inline int GetCurrentEntries() { return *reinterpret_cast<int *>(GetData() + ENTRY_COUNT_OFFSET); }
@@ -25,6 +22,9 @@ namespace yedis {
     // degree t
     inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
     inline void SetDegree(uint32_t degree) { EncodeFixed32(GetData() + DEGREE_OFFSET, degree); }
+    // set available
+    inline size_t GetAvailable() { return *reinterpret_cast<size_t*>(GetData() + AVAILABLE_OFFSET); }
+    inline void SetAvailable(size_t available) { EncodeFixed32(GetData() + AVAILABLE_OFFSET, available); }
     // is leaf node
     inline bool IsLeafNode() {
       return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
@@ -40,7 +40,7 @@ namespace yedis {
       if (!IsLeafNode()) {
         return GetDegree() == MAX_DEGREE;
       }
-      return available() >= sz;
+      return GetAvailable() < sz;
     }
     // get parent id
     inline page_id_t GetParentPageID() {
@@ -64,14 +64,25 @@ namespace yedis {
       assert(idx <= GetCurrentEntries());
       return ChildPosStart()[idx];
     }
+
+    // entries pointer
+    inline byte* EntryPosStart() {
+      auto offset = KEY_POS_OFFSET + (4 * GetDegree() - 1) * sizeof(int64_t);
+      auto entryStart = reinterpret_cast<byte *>(GetData() + offset);
+      return reinterpret_cast<byte*>(entryStart);
+    }
+    inline size_t GetEntryTail() {
+      return PAGE_SIZE - GetAvailable();
+    }
     // interface
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
-    Status add(int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
-    virtual Status read(const byte *key, std::string *result);
+    Status add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
+    Status read(const byte *key, std::string *result);
+    Status read(int64_t key, std::string* result);
+    BTreeNodePage * search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
 
-    BTreeNodePage * search(int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
-
-    virtual void init(int degree, page_id_t page_id);
+//    virtual void init(int degree, page_id_t page_id);
+    void init(int degree, page_id_t page_id);
     void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
 
     inline void leaf_init(BTreeNodePage* dst, int n, page_id_t page_id) {
@@ -83,31 +94,26 @@ namespace yedis {
     class EntryIterator {
      public:
       EntryIterator(char *ptr): data_(ptr) {}
-      EntryIterator& operator = (const EntryIterator& iter) { data_ = iter.data_; }
+      EntryIterator& operator = (const EntryIterator& iter) = default;
       bool operator != (const EntryIterator& iter) const;
       EntryIterator& operator ++();
       EntryIterator& operator ++(int);
       int64_t key() const;
+      size_t size() const;
+      size_t value_size() const;
+      bool ValueLessThan(const byte* value, size_t v_len);
       char *data_;
     };
-    BTreeNodePage* NewLeafPage(int cnt, const EntryIterator& start, const EntryIterator& end);
-    BTreeNodePage* NewIndexPage(int cnt, int64_t key, page_id_t left,  page_id_t right);
+    BTreeNodePage* NewLeafPage(BufferPoolManager*, int cnt, const EntryIterator& start, const EntryIterator& end);
+    BTreeNodePage* NewIndexPage(BufferPoolManager*, int cnt, int64_t key, page_id_t left,  page_id_t right);
     // 迁移start到末尾的key和child到新的index page上
-    BTreeNodePage* NewIndexPageFrom(BTreeNodePage* src, int start);
-
-   private:
-    YedisInstance* yedis_instance_;
+    BTreeNodePage* NewIndexPageFrom(BufferPoolManager*, BTreeNodePage* src, int start);
     size_t available() {
-      return PAGE_SIZE - entry_tail_;
+      return GetAvailable();
     }
-    BTreeNodePage* index_split(BTreeNodePage* parent, int child_idx);
-    BTreeNodePage* leaf_split(BTreeNodePage* parent, int child_idx);
+    BTreeNodePage* index_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
+    BTreeNodePage* leaf_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
     void index_node_add_child(int pos, int64_t key, page_id_t child);
-    // entry tail
-    size_t entry_tail_;
-    // degree
-    int t_;
-
   };
 }
 

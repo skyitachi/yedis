@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iostream>
 #include "config.hpp"
+#include "util.hpp"
 
 namespace yedis {
   class Page {
@@ -24,15 +25,21 @@ namespace yedis {
       is_dirty_ = is_dirty;
     }
 
-    page_id_t GetPageId() const {
+    auto GetPageId() const {
       return page_id_;
     }
+
+    void SetPageID(page_id_t page_id) {
+      page_id_ = page_id;
+      EncodeFixed32(GetData(), page_id);
+    }
+
 
    protected:
     static constexpr size_t OFFSET_PAGE_START = 0;
 
     page_id_t page_id_ = INVALID_PAGE_ID;
-   public:
+
    private:
     inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, PAGE_SIZE);}
     char data_[PAGE_SIZE]{};

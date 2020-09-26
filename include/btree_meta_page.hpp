@@ -10,7 +10,7 @@
 
 /**
  * Meta Page Format
- * page_id(4) + root_page_offset(4) + btree_levels(4)
+ * page_id(4) + root_page_id(4) + btree_levels(4)
  */
 namespace yedis {
 
@@ -24,9 +24,17 @@ class BTreeMetaPage: public Page {
   inline page_id_t GetRootPageId() {
     return DecodeFixed32(GetData() + sizeof(page_id_t));
   }
+  inline void SetRootPageId(page_id_t page_id) {
+    EncodeFixed32(GetData() + sizeof(page_id_t), page_id);
+    SetIsDirty(true);
+  }
   // btree_levels, start from 1
   inline int32_t GetLevels() {
     return DecodeFixed32(GetData() + 2 * sizeof(page_id_t));
+  }
+  inline void SetLevels(int level) {
+    EncodeFixed32(GetData() + 2 * sizeof(page_id_t), level);
+    SetIsDirty(true);
   }
 };
 }

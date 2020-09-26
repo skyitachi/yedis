@@ -27,7 +27,7 @@ class BTreeIndexNodePage: public BTreeNodePage {
 
   // 初始化keys数组
   // 或者说如何让底层数据直接以iterator的形式访问
-  void init(int degree, page_id_t page_id) override;
+  void init(int degree, page_id_t page_id);
 
  private:
   typedef std::tuple<byte*, size_t> Byte;

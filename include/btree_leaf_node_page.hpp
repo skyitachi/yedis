@@ -36,8 +36,8 @@ class BTreeLeafNodePage: public BTreeNodePage {
     return reinterpret_cast<byte*>(entryStart);
   }
   //
-  Status add(const byte *key, size_t k_len, const byte *value, size_t v_len) override;
-  Status read(const byte *key, std::string *result) override;
+  Status add(const byte *key, size_t k_len, const byte *value, size_t v_len);
+  Status read(const byte *key, std::string *result);
 
   void init(int degree, page_id_t page_id);
 

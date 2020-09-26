@@ -32,23 +32,27 @@ int main() {
   auto zsetIndexTree = new yedis::BTree(yInstance);
 
 //  zsetIndexTree->add("k2]")
-  for (int i = 9; i >= 0; i--) {
-    std::string k = "k";
-    std::string v = "v";
-    zsetIndexTree->add(k + std::to_string(i), v + std::to_string(i));
+//  for (int i = 9; i >= 0; i--) {
+//    std::string k = "k";
+//    std::string v = "v";
+//    zsetIndexTree->add(i, v + std::to_string(i));
+//  }
+  {
+    auto s = zsetIndexTree->add(1, "v1");
+    assert(s.ok());
   }
 
   // test for read
-  for (int i = 0; i < 10; i++) {
-    std::string k = "k";
-    std::string v;
-    auto s = zsetIndexTree->read(k + std::to_string(i), &v);
-    if (!s.ok()) {
-      spdlog::info("not found key={}, value={}", k + std::to_string(i));
-      continue;
-    }
-    spdlog::info("found key={}, value={}", k + std::to_string(i), v);
-  }
+//  for (int i = 0; i < 10; i++) {
+//    std::string k = "k";
+//    std::string v;
+//    auto s = zsetIndexTree->read(i, &v);
+//    if (!s.ok()) {
+//      spdlog::info("not found key={}, value={}", k + std::to_string(i));
+//      continue;
+//    }
+//    spdlog::info("found key={}, value={}", k + std::to_string(i), v);
+//  }
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();

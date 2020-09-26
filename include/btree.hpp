@@ -59,13 +59,12 @@ class BTree {
     init();
   };
   Status init();
-  Status add(const Slice &key, const Slice &value);
-  Status read(const Slice &key, std::string *value);
+  Status add(int64_t key, const Slice &value);
+  Status read(int64_t key, std::string *value);
   Status destroy();
  private:
   BTreeMetaPage* meta_;
   BTreeLeafNodePage * leaf_root_;
-  BTreeIndexNodePage* index_root_;
   BTreeNodePage *root_;
   std::string file_name_;
   YedisInstance* yedis_instance_;

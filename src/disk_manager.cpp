@@ -22,12 +22,8 @@ namespace yedis {
 
   void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
     lseek(fd_, page_id * PAGE_SIZE, SEEK_SET);
-    int sz = read(fd_, page_data, PAGE_SIZE);
-    if (sz != PAGE_SIZE) {
-      spdlog::info("read page error, {}", sz);
-    } else {
-      spdlog::info("read success");
-    }
+    read(fd_, page_data, PAGE_SIZE);
+    spdlog::info("[ReadPage] success");
   }
 
   void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
