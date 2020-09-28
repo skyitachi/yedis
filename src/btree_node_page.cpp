@@ -171,7 +171,14 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) 
   EncodeFixed64(pos_start, key);
   EncodeFixed32(pos_start + sizeof(int64_t), v_len);
   memcpy(pos_start + sizeof(int64_t) + v_len, value, v_len);
+
+  // update entry count
+  auto cur_entries = GetCurrentEntries();
+  SetCurrentEntries(cur_entries + 1);
   spdlog::debug("leaf_insert ok");
+  // update available size
+  SetAvailable(GetAvailable() - total_len);
+  spdlog::debug("current page has available space {}", GetAvailable());
   return Status::OK();
 }
 
