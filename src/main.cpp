@@ -40,6 +40,10 @@ int main() {
   {
     auto s = zsetIndexTree->add(1, "v1");
     assert(s.ok());
+    s = zsetIndexTree->add(2, "v1");
+    assert(s.ok());
+    s = zsetIndexTree->add(3, "v1");
+    assert(s.ok());
   }
 
   // test for read

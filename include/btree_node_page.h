@@ -46,7 +46,6 @@ namespace yedis {
     inline page_id_t GetParentPageID() {
       return *reinterpret_cast<page_id_t*>(GetData() + PARENT_OFFSET);
     }
-
     inline int64_t* KeyPosStart() {
       return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
     }
@@ -65,10 +64,25 @@ namespace yedis {
       return ChildPosStart()[idx];
     }
 
+    // get and set prev page_id
+    inline page_id_t GetPrevPageID() {
+      return *reinterpret_cast<page_id_t*>(GetData() + PREV_NODE_PAGE_ID_OFFSET);
+    }
+    inline void SetPrevPageID(page_id_t page_id) {
+      EncodeFixed32(GetData() + PREV_NODE_PAGE_ID_OFFSET, page_id);
+    }
+
+    inline page_id_t GetNextPageID() {
+      return *reinterpret_cast<page_id_t*>(GetData() + NEXT_NODE_PAGE_ID_OFFSET);
+    }
+
+    inline void SetNextPageID(page_id_t page_id) {
+      EncodeFixed32(GetData() + NEXT_NODE_PAGE_ID_OFFSET, page_id);
+    }
+
     // entries pointer
     inline byte* EntryPosStart() {
-      auto offset = KEY_POS_OFFSET + (4 * GetDegree() - 1) * sizeof(int64_t);
-      auto entryStart = reinterpret_cast<byte *>(GetData() + offset);
+      auto entryStart = reinterpret_cast<byte *>(GetData() + ENTRY_OFFSET);
       return reinterpret_cast<byte*>(entryStart);
     }
     inline size_t GetEntryTail() {

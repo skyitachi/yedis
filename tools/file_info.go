@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -17,7 +18,39 @@ const (
 	EntryCountOffset = 4
 	AvailableOffset  = 12
 	FlagOffset       = 16
+	EntryOffset      = 29
 )
+
+type Entry struct {
+	Key   int64
+	VLen  int32
+	Value []byte
+}
+
+func ReadEntry(reader *bytes.Reader) (*Entry, error) {
+	entry := &Entry{}
+	var key int64
+	err := binary.Read(reader, binary.LittleEndian, &key)
+	if err != nil {
+		return nil, err
+	}
+	entry.Key = key
+	var vLen int32
+	err = binary.Read(reader, binary.LittleEndian, vLen)
+	if err != nil {
+		return nil, err
+	}
+	entry.VLen = vLen
+	entry.Value = make([]byte, vLen)
+	n, err := reader.Read(entry.Value)
+	if err != nil {
+		return nil, err
+	}
+	if n != int(vLen) {
+		return nil, fmt.Errorf("not enough data: vLen=%d, read=%d", vLen, n)
+	}
+	return entry, nil
+}
 
 func main() {
 	btreeFile, err := os.Open("btree.idx")
@@ -92,4 +125,17 @@ func main() {
 		log.Printf("root node is index node")
 	}
 
+	skipped, err = rootReader.Seek(8, io.SeekCurrent)
+	if err != nil {
+		log.Fatalf("read entry seek error %+v", err)
+	}
+	log.Println("read entry seek offset: ", skipped)
+
+	for i := 0; i < int(entryCount); i++ {
+		entry, err := ReadEntry(rootReader)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("entry value %+v", entry)
+	}
 }

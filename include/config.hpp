@@ -48,7 +48,11 @@ static constexpr int AVAILABLE_OFFSET = 12;
 static constexpr int FLAG_OFFSET = 16;
 static constexpr int PARENT_OFFSET = 17;
 static constexpr int KEY_POS_OFFSET = 21;
-static constexpr int ENTRY_OFFSET =  KEY_POS_OFFSET + (4 * MAX_DEGREE - 1) * sizeof(uint32_t);
+
+// leaf node
+static constexpr int PREV_NODE_PAGE_ID_OFFSET = 21;
+static constexpr int NEXT_NODE_PAGE_ID_OFFSET = 25;
+static constexpr int ENTRY_OFFSET = 32;
 
 }
 #endif //YEDIS_INCLUDE_CONFIG_HPP_
