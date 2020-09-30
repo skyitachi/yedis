@@ -12,11 +12,12 @@ namespace yedis {
 using BTreeNodeIter = BTreeNodePage::EntryIterator;
 
 void BTreeNodePage::init(int degree, page_id_t page_id) {
+  // 没有初始化过的一定是leaf node
   if (GetAvailable() == 0) {
     spdlog::debug("page_id {} set available", page_id);
-    SetAvailable(PAGE_SIZE - HEADER_SIZE);
+    SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE);
     SetIsDirty(true);
-    assert(GetAvailable() == PAGE_SIZE - HEADER_SIZE);
+    assert(GetAvailable() == PAGE_SIZE - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
   spdlog::debug("curent page available {}", GetAvailable());
@@ -153,6 +154,7 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) 
   BTreeNodeIter start(entry_pos_start);
   BTreeNodeIter end(GetData() + GetEntryTail());
   size_t offset = entry_pos_start - GetData();
+  spdlog::debug("initial offset {}", offset);
   for(auto it = start; it != end; it++) {
     if (key < it.key()) {
       break;
@@ -162,9 +164,10 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) 
       }
     }
     offset += it.size();
+    spdlog::debug("key: {}, size: {}", it.key(), it.size());
   }
   auto total_len = sizeof(key) + 4 + v_len;
-  spdlog::debug("value total len: {}", total_len);
+  spdlog::debug("value total len: {}, offset: {}, entry_tail: {}", total_len, offset, GetEntryTail());
   memcpy(entry_pos_start + offset + total_len, entry_pos_start + offset, GetEntryTail() - offset);
   // write value
   auto pos_start = entry_pos_start + offset;

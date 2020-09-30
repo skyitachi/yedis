@@ -50,9 +50,10 @@ static constexpr int PARENT_OFFSET = 17;
 static constexpr int KEY_POS_OFFSET = 21;
 
 // leaf node
+static constexpr int LEAF_HEADER_SIZE = 29;
 static constexpr int PREV_NODE_PAGE_ID_OFFSET = 21;
 static constexpr int NEXT_NODE_PAGE_ID_OFFSET = 25;
-static constexpr int ENTRY_OFFSET = 32;
+static constexpr int ENTRY_OFFSET = 29;
 
 }
 #endif //YEDIS_INCLUDE_CONFIG_HPP_
