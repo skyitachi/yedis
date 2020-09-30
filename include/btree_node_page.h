@@ -85,8 +85,9 @@ namespace yedis {
       auto entryStart = reinterpret_cast<byte *>(GetData() + ENTRY_OFFSET);
       return reinterpret_cast<byte*>(entryStart);
     }
+    // only leaf node needs
     inline size_t GetEntryTail() {
-      return PAGE_SIZE - GetAvailable();
+      return PAGE_SIZE - GetAvailable() - LEAF_HEADER_SIZE;
     }
     // interface
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
@@ -103,7 +104,7 @@ namespace yedis {
       return init(dst, 0, n, page_id, true);
     }
     // insert kv pair to leaf node
-    Status leaf_insert(int64_t key, const byte* value, size_t v_len);
+    Status leaf_insert(int64_t key, const byte* value, int32_t v_len);
 
     class EntryIterator {
      public:

@@ -38,12 +38,13 @@ int main() {
 //    zsetIndexTree->add(i, v + std::to_string(i));
 //  }
   {
-    auto s = zsetIndexTree->add(1, "v1");
+    yedis::Status s;
+//    s = zsetIndexTree->add(2, "v2");
+//    assert(s.ok());
+    s = zsetIndexTree->add(1, "v1");
     assert(s.ok());
-    s = zsetIndexTree->add(2, "v1");
-    assert(s.ok());
-    s = zsetIndexTree->add(3, "v1");
-    assert(s.ok());
+//    s = zsetIndexTree->add(3, "v1");
+//    assert(s.ok());
   }
 
   // test for read

@@ -23,7 +23,7 @@ const (
 
 type Entry struct {
 	Key   int64
-	VLen  int32
+	VLen  uint32
 	Value []byte
 }
 
@@ -34,9 +34,10 @@ func ReadEntry(reader *bytes.Reader) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("read entry key: ", key)
 	entry.Key = key
-	var vLen int32
-	err = binary.Read(reader, binary.LittleEndian, vLen)
+	var vLen uint32
+	err = binary.Read(reader, binary.LittleEndian, &vLen)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func main() {
 		log.Printf("root node is index node")
 	}
 
-	skipped, err = rootReader.Seek(8, io.SeekCurrent)
+	skipped, err = rootReader.Seek(12, io.SeekCurrent)
 	if err != nil {
 		log.Fatalf("read entry seek error %+v", err)
 	}
@@ -136,6 +137,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("entry value %+v", entry)
+		log.Printf("entry value %+v", string(entry.Value))
 	}
 }

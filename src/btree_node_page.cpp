@@ -149,12 +149,11 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
 }
 
 // NOTE: 要确保有足够的空间
-Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) {
+Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len) {
   auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
   BTreeNodeIter start(entry_pos_start);
-  BTreeNodeIter end(GetData() + GetEntryTail());
-  size_t offset = entry_pos_start - GetData();
-  spdlog::debug("initial offset {}", offset);
+  BTreeNodeIter end(entry_pos_start + GetEntryTail());
+  size_t offset = 0;
   for(auto it = start; it != end; it++) {
     if (key < it.key()) {
       break;
@@ -164,24 +163,28 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, size_t v_len) 
       }
     }
     offset += it.size();
-    spdlog::debug("key: {}, size: {}", it.key(), it.size());
   }
   auto total_len = sizeof(key) + 4 + v_len;
   spdlog::debug("value total len: {}, offset: {}, entry_tail: {}", total_len, offset, GetEntryTail());
   memcpy(entry_pos_start + offset + total_len, entry_pos_start + offset, GetEntryTail() - offset);
+
   // write value
   auto pos_start = entry_pos_start + offset;
   EncodeFixed64(pos_start, key);
+  spdlog::debug("write key {} success", key);
   EncodeFixed32(pos_start + sizeof(int64_t), v_len);
-  memcpy(pos_start + sizeof(int64_t) + v_len, value, v_len);
+  spdlog::debug("test read vlen: {}", DecodeFixed32(pos_start + sizeof(int64_t)));
+  spdlog::debug("write value length {} success, sizeof(size_t): {}", v_len, sizeof(size_t));
+  memcpy(pos_start + sizeof(int64_t) + sizeof(int32_t), value, v_len);
 
   // update entry count
   auto cur_entries = GetCurrentEntries();
   SetCurrentEntries(cur_entries + 1);
-  spdlog::debug("leaf_insert ok");
+  spdlog::debug("leaf_insert ok: {}", GetCurrentEntries());
   // update available size
   SetAvailable(GetAvailable() - total_len);
   spdlog::debug("current page has available space {}", GetAvailable());
+  SetIsDirty(true);
   return Status::OK();
 }
 
