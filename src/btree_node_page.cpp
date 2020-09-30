@@ -20,7 +20,7 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
     assert(GetAvailable() == PAGE_SIZE - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
-  spdlog::debug("curent page available {}", GetAvailable());
+  SPDLOG_INFO("curent page available {}", GetAvailable());
 }
 
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root) {
@@ -29,7 +29,8 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
-  spdlog::info("target_left_page: {}", target_leaf_page->GetPageID());
+  assert(target_leaf_page != nullptr);
+  SPDLOG_INFO("target_left_page: {}", target_leaf_page->GetPageID());
   return target_leaf_page->leaf_insert(key, value, v_len);
 }
 
@@ -48,18 +49,26 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   assert(root != nullptr);
   if (cur->IsLeafNode()) {
     spdlog::debug("page {} is leaf node", cur->GetPageID());
-    if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(size_t))) {
+    if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(int32_t))) {
       spdlog::debug("page {} leaf node is full", cur->GetPageID());
       auto new_root = leaf_split(buffer_pool_manager, nullptr, -1);
       if (*root != nullptr) {
-        spdlog::debug("root not null root page_id: {}", (*root)->GetPageID());
         //　update root
+        spdlog::debug("root not null root page_id: {}", (*root)->GetPageID());
+        if (new_root != nullptr) {
+          spdlog::debug("search found new root: {}", new_root->GetPageID());
+        } else {
+          spdlog::debug("search found new empty root");
+        }
+        assert(new_root != nullptr);
         *root = new_root;
       }
       // 此时root只有一个结点
       if (key < new_root->GetKey(0)) {
+        SPDLOG_INFO("return from first child: {}", new_root->GetKey(0));
         return reinterpret_cast<BTreeNodePage*>(new_root->GetChild(0));
       }
+      SPDLOG_INFO("return from second child: {}", new_root->GetKey(1));
       return reinterpret_cast<BTreeNodePage*>(new_root->GetChild(1));
     }
     // leaf node没有满直接返回
@@ -121,20 +130,24 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
 // 返回new root
 BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, BTreeNodePage* parent, int child_idx) {
   int n_entries = GetCurrentEntries();
-  BTreeNodeIter start(GetData());
-  BTreeNodeIter end(GetData() + GetEntryTail());
+  SPDLOG_INFO("current_entries: {}", n_entries);
+  auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
+  BTreeNodeIter start(entry_pos_start);
+  BTreeNodeIter end(entry_pos_start + GetEntryTail());
   int count = 0;
   auto it = start;
+  SPDLOG_INFO("first iterator key: {}", it.key());
   // 寻找mid
   for (int i = 0; i < n_entries; i++, it++) {
     count++;
-    if (count == n_entries / 2) {
+    if (count >= n_entries / 2) {
       break;
     }
   }
   // new index page
   // new leaf node page
   auto mid_key = it.key();
+  SPDLOG_INFO("mid key: {}", mid_key);
   it++;
   count++;
   auto new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);

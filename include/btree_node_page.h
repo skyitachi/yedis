@@ -49,6 +49,7 @@ namespace yedis {
     inline int64_t* KeyPosStart() {
       return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
     }
+    // index node
     inline int64_t GetKey(int idx) {
       assert(idx < GetCurrentEntries());
       return KeyPosStart()[idx];
