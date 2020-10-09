@@ -5,6 +5,8 @@
 #ifndef YEDIS_INCLUDE_BTREE_NODE_PAGE_H_
 #define YEDIS_INCLUDE_BTREE_NODE_PAGE_H_
 
+#include <spdlog/spdlog.h>
+
 #include "page.hpp"
 #include "btree.hpp"
 
@@ -51,6 +53,7 @@ namespace yedis {
     }
     // index node
     inline int64_t GetKey(int idx) {
+      SPDLOG_INFO("GetKey idx: {}, entries: {}", idx, GetCurrentEntries());
       assert(idx < GetCurrentEntries());
       return KeyPosStart()[idx];
     }

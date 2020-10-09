@@ -3,6 +3,7 @@
 //
 #include <buffer_pool_manager.hpp>
 #include <spdlog/spdlog.h>
+#include <utility>
 namespace yedis {
 
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance) {
@@ -18,6 +19,13 @@ BufferPoolManager::~BufferPoolManager() {
 
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   spdlog::info("FetchPage current_index_ {}, page_id {}", current_index_, page_id);
+  auto it = records_.find(page_id);
+  if (it != records_.end()) {
+    // 当前page在内存中
+    SPDLOG_INFO("page_id: {} is current_index {}", page_id, it->second);
+    return &pages_[it->second];
+  }
+  records_.insert(std::make_pair(page_id, current_index_));
   Page *next_page = &pages_[current_index_];
   yedis_instance_->disk_manager->ReadPage(page_id, next_page->GetData());
   auto next_index = (current_index_ + 1) % pool_size_;

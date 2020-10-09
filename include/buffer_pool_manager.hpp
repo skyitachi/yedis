@@ -5,6 +5,8 @@
 #ifndef YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_
 #define YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_
 
+#include <unordered_map>
+
 #include "page.hpp"
 #include "yedis.hpp"
 #include "disk_manager.hpp"
@@ -28,6 +30,7 @@ class BufferPoolManager {
   YedisInstance* yedis_instance_;
   Page* pages_;
   int current_index_;
+  std::unordered_map<page_id_t, int> records_;
 };
 }
 #endif //YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_
