@@ -31,7 +31,8 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
   SPDLOG_INFO("target_left_page: {}", target_leaf_page->GetPageID());
-  return target_leaf_page->leaf_insert(key, value, v_len);
+  auto s = target_leaf_page->leaf_insert(key, value, v_len);
+  return s;
 }
 
 Status BTreeNodePage::read(int64_t key, std::string *result) {

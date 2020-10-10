@@ -16,8 +16,19 @@ Status BTree::add(int64_t key, const Slice& value) {
     // 判断应该在哪个叶子节点上
   }
   Status s;
-
-  return root_->add(yedis_instance_->buffer_pool_manager, key, reinterpret_cast<const byte *>(value.data()), value.size(), &root_);
+  auto origin_root = root_;
+  s = root_->add(yedis_instance_->buffer_pool_manager, key, reinterpret_cast<const byte *>(value.data()), value.size(), &root_);
+  if (!s.ok()) {
+    return s;
+  }
+  if (origin_root != root_) {
+    // root有更新, 代表level + 1
+    meta_->SetLevels(meta_->GetLevels() + 1);
+    // 更新root page
+    meta_->SetRootPageId(root_->GetPageID());
+    SPDLOG_INFO("update meta info successfully");
+  }
+  return s;
 }
 
 Status BTree::read(int64_t key, std::string *value) {

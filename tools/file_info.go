@@ -53,6 +53,41 @@ func ReadEntry(reader *bytes.Reader) (*Entry, error) {
 	return entry, nil
 }
 
+// TODO: flag的位置要调整
+func ReadIndexNode(reader *bytes.Reader, count int, degree int) (keys []int64, childs []int32, err error) {
+	keyBytes := make([]byte, count*8)
+	_, err = reader.Read(keyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	buf := bytes.NewBuffer(keyBytes)
+	for i := 0; i < count; i++ {
+		var ret int64
+		if err = binary.Read(buf, binary.LittleEndian, &ret); err != nil {
+			log.Println(err)
+			return nil, nil, err
+		}
+		keys = append(keys, ret)
+	}
+	_, err = reader.Seek(int64((degree-count)*8), io.SeekCurrent)
+	if err != nil {
+		return nil, nil, err
+	}
+	childBytes := make([]byte, (count+1)*4)
+	_, err = reader.Read(childBytes)
+	buf = bytes.NewBuffer(childBytes)
+	for i := 0; i <= count; i++ {
+		var ret int32
+		if err = binary.Read(buf, binary.LittleEndian, &ret); err != nil {
+			log.Println(err)
+			return nil, nil, err
+		}
+		childs = append(childs, ret)
+	}
+	return
+
+}
+
 func main() {
 	btreeFile, err := os.Open("btree.idx")
 	if err != nil {
@@ -110,11 +145,10 @@ func main() {
 	log.Printf("root page has %+v entries\n", entryCount)
 
 	var avaiable int32
-	skipped, err := rootReader.Seek(4, io.SeekCurrent)
+	_, err = rootReader.Seek(4, io.SeekCurrent)
 	if err != nil {
 		log.Fatalf("Seek error %+v", err)
 	}
-	log.Println("current offset: ", skipped)
 	_ = binary.Read(rootReader, binary.LittleEndian, &avaiable)
 	log.Printf("available space: %+v\n", avaiable)
 
@@ -122,21 +156,20 @@ func main() {
 	_ = binary.Read(rootReader, binary.LittleEndian, &flag)
 	if flag == 0 {
 		log.Printf("root node is leaf node")
+		_, err = rootReader.Seek(12, io.SeekCurrent)
+		if err != nil {
+			log.Fatalf("read entry seek error %+v", err)
+		}
+
+		for i := 0; i < int(entryCount); i++ {
+			entry, err := ReadEntry(rootReader)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("entry value len: %+v", len(entry.Value))
+		}
 	} else {
 		log.Printf("root node is index node")
 	}
 
-	skipped, err = rootReader.Seek(12, io.SeekCurrent)
-	if err != nil {
-		log.Fatalf("read entry seek error %+v", err)
-	}
-	log.Println("read entry seek offset: ", skipped)
-
-	for i := 0; i < int(entryCount); i++ {
-		entry, err := ReadEntry(rootReader)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("entry value %+v", string(entry.Value))
-	}
 }
