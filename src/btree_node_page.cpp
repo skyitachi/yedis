@@ -14,13 +14,13 @@ using BTreeNodeIter = BTreeNodePage::EntryIterator;
 void BTreeNodePage::init(int degree, page_id_t page_id) {
   // 没有初始化过的一定是leaf node
   if (GetAvailable() == 0) {
-    spdlog::debug("page_id {} set available", page_id);
     SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE);
     SetIsDirty(true);
     assert(GetAvailable() == PAGE_SIZE - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
-  SPDLOG_INFO("curent page available {}", GetAvailable());
+  // degree is needed
+  SetDegree(degree);
 }
 
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root) {
@@ -30,7 +30,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
-  SPDLOG_INFO("target_left_page: {}", target_leaf_page->GetPageID());
+  SPDLOG_INFO("key={}, search leaf page: {}, successfully", key, target_leaf_page->GetPageID());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
   return s;
 }
@@ -46,45 +46,16 @@ Status BTreeNodePage::read(const byte *key, std::string *result) {
 // 搜索改key对应的leaf node, 默认是从根结点向下搜索
 // NOTE: 暂时只考虑不重复key的情况
 BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
-  auto cur = this;
   assert(root != nullptr);
-  if (cur->IsLeafNode()) {
-    spdlog::debug("page {} is leaf node", cur->GetPageID());
-    if (cur->IsFull(v_len + sizeof(int64_t) + sizeof(int32_t))) {
-      spdlog::debug("page {} leaf node is full", cur->GetPageID());
-      auto new_root = leaf_split(buffer_pool_manager, nullptr, -1);
-      if (*root != nullptr) {
-        //　update root
-        spdlog::debug("root not null root page_id: {}", (*root)->GetPageID());
-        if (new_root != nullptr) {
-          spdlog::debug("search found new root: {}", new_root->GetPageID());
-        } else {
-          spdlog::debug("search found new empty root");
-        }
-        assert(new_root != nullptr);
-        *root = new_root;
-      }
-      // 此时root只有一个结点
-      // Note:　分裂之后一定是leaf node
-      // TODO: degree有问题
-      SPDLOG_INFO("new_root entries: {}, degree: {}", new_root->GetCurrentEntries(), new_root->GetDegree());
-      if (key < new_root->GetKey(0)) {
-        SPDLOG_INFO("return from first child: {}", new_root->GetKey(0));
-        return reinterpret_cast<BTreeNodePage*>(new_root->GetChild(0));
-      }
-      auto child_page_id = new_root->GetChild(1);
-      SPDLOG_INFO("target leaf node page_id: {}", child_page_id);
-      return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
-    }
-    // leaf node没有满直接返回
-    return this;
-  }
+  auto total_len = v_len + sizeof(int64_t) + sizeof(int32_t);
   // 非叶子结点
   auto it = this;
   BTreeNodePage* parent = nullptr;
-  int pos = -1;
+  int pos = 0;
+//  SPDLOG_INFO("search to index node: key={}, page_id={}", key, it->GetPageID());
   while(!it->IsLeafNode()) {
     if (it->IsFull()) {
+      SPDLOG_INFO("found index node={} full", it->GetPageID());
       if (*root == this) {
         // 当前index node就是根节点
         auto new_root = index_split(buffer_pool_manager, nullptr, 0);
@@ -94,7 +65,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         index_split(buffer_pool_manager, parent, pos);
       }
     }
-    // ignore duplicate key
+    // TODO: ignore duplicate key
     int64_t* key_start = KeyPosStart();
     int n_keys = GetCurrentEntries();
     auto child_start = ChildPosStart();
@@ -104,15 +75,43 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     if (result != key_end) {
       // found
       pos = result - key_start;
-      spdlog::debug("child pos: {}", pos);
-      spdlog::debug("child pos: {}, child page_id: {}", pos, child_start[pos]);
+      spdlog::debug("key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
       it =  reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
     } else {
       // key 最大
       pos = n_keys;
+      spdlog::debug("biggest key: key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
       it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
     }
   }
+  if (it->IsFull(total_len)) {
+    SPDLOG_DEBUG("page {} leaf node is full", it->GetPageID());
+    auto new_root = it->leaf_split(buffer_pool_manager, parent, pos);
+    if (*root != nullptr) {
+      //　update root
+      SPDLOG_INFO("root not null root page_id: {}", (*root)->GetPageID());
+      if (new_root != nullptr) {
+        spdlog::debug("search found new root: {}", new_root->GetPageID());
+        *root = new_root;
+      } else {
+        spdlog::debug("root not changed");
+      }
+    }
+    if (parent == nullptr) {
+      parent = *root;
+    }
+    assert(parent != nullptr);
+    SPDLOG_INFO("new_root={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
+    SPDLOG_INFO("pos: {}, index key: {}, first key: {}", pos, parent->GetKey(pos), parent->GetKey(0));
+    if (key < parent->GetKey(pos)) {
+      return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
+    }
+    // 只有在第一次leaf node 分裂的情况下才会出现
+    auto child_page_id = parent->GetChild(pos + 1);
+    SPDLOG_INFO("target leaf node page_id: {}", child_page_id);
+    return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
+  }
+  // leaf node没有满直接返回
   return it;
 }
 
@@ -134,14 +133,14 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
 
 // 返回new root
 BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, BTreeNodePage* parent, int child_idx) {
+  assert(IsLeafNode());
   int n_entries = GetCurrentEntries();
-  SPDLOG_INFO("current_entries: {}", n_entries);
+  SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
   auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
   BTreeNodeIter start(entry_pos_start);
   BTreeNodeIter end(entry_pos_start + GetEntryTail());
   int count = 0;
   auto it = start;
-  SPDLOG_INFO("first iterator key: {}", it.key());
   // 寻找mid
   for (int i = 0; i < n_entries; i++, it++) {
     count++;
@@ -152,9 +151,15 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   // new index page
   // new leaf node page
   auto mid_key = it.key();
+  // TODO: mid_key的更新有问题
   SPDLOG_INFO("mid key: {}, count: {}", mid_key, count);
   it++;
   auto new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
+  // update entries and count
+  SetCurrentEntries(count);
+  SetAvailable(GetAvailable() + (end.data_ - it.data_));
+
+  SPDLOG_INFO("after split available={}", GetAvailable());
   if (parent == nullptr) {
     auto new_index_page = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_leaf_page->GetPageID());
     return new_index_page;
@@ -173,7 +178,7 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
   BTreeNodeIter start(entry_pos_start);
   BTreeNodeIter end(entry_pos_start + GetEntryTail());
   size_t offset = 0;
-  SPDLOG_INFO("current entry tail {}, page_id {}", GetEntryTail(), GetPageID());
+//  SPDLOG_INFO("current entry tail {}, page_id {}", GetEntryTail(), GetPageID());
   for(auto it = start; it != end; it++) {
     if (key < it.key()) {
       break;
@@ -184,26 +189,21 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
     }
     offset += it.size();
   }
-  auto total_len = sizeof(key) + 4 + v_len;
-  spdlog::debug("value total len: {}, offset: {}, entry_tail: {}", total_len, offset, GetEntryTail());
+  auto total_len = sizeof(key) + sizeof(int32_t) + v_len;
+  SPDLOG_INFO("key={}, offset={}, available={}, entry_tail= {}, move size= {}", key, offset, GetAvailable(), GetEntryTail(), GetEntryTail() - offset);
   memcpy(entry_pos_start + offset + total_len, entry_pos_start + offset, GetEntryTail() - offset);
 
   // write value
   auto pos_start = entry_pos_start + offset;
   EncodeFixed64(pos_start, key);
-  spdlog::debug("write key {} success", key);
   EncodeFixed32(pos_start + sizeof(int64_t), v_len);
-  spdlog::debug("test read vlen: {}", DecodeFixed32(pos_start + sizeof(int64_t)));
-  spdlog::debug("write value length {} success, sizeof(size_t): {}", v_len, sizeof(size_t));
   memcpy(pos_start + sizeof(int64_t) + sizeof(int32_t), value, v_len);
 
   // update entry count
   auto cur_entries = GetCurrentEntries();
   SetCurrentEntries(cur_entries + 1);
-  spdlog::debug("leaf_insert ok: {}", GetCurrentEntries());
   // update available size
   SetAvailable(GetAvailable() - total_len);
-  spdlog::debug("current page has available space {}", GetAvailable());
   SetIsDirty(true);
   return Status::OK();
 }
@@ -214,16 +214,18 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
   page_id_t new_page_id;
   auto next_page = static_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
   assert(new_page_id != INVALID_PAGE_ID);
+
   leaf_init(next_page, cnt, new_page_id);
   // 复制内容
-  SPDLOG_INFO("copy {} size data", end.data_ - start.data_);
   auto copied_sz = end.data_ - start.data_;
-  memcpy(next_page->GetData(), start.data_, end.data_ - start.data_);
+  // NOTE: 应该从entry start开始复制
+  memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
   next_page->SetIsDirty(true);
   next_page->SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE - copied_sz);
   return next_page;
 }
 
+// TODO: make static method
 BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manager, int cnt, int64_t key, page_id_t left, page_id_t right) {
   page_id_t new_page_id;
   auto next_page = static_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
@@ -236,6 +238,7 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manage
   auto child_start = next_page->ChildPosStart();
   child_start[0] = left;
   child_start[1] = right;
+  SPDLOG_INFO("index page child: {} {}, child offset: {}", left, right, reinterpret_cast<char *>(child_start) - next_page->GetData());
   next_page->SetIsDirty(true);
   // 设置entries
   next_page->SetCurrentEntries(cnt);
@@ -258,23 +261,27 @@ BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BufferPoolManager* buffer_pool_ma
   return new_page;
 }
 
+// TODO: 还需要考虑乱序插入情况
 void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) {
   assert(pos >= 0);
+  SPDLOG_INFO("key_pos={}, key={}, child={}", pos, key, child);
   auto key_start = KeyPosStart();
   auto n_entry = GetCurrentEntries();
   memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
   key_start[pos]= key;
 
   auto child_start = ChildPosStart();
-  memcpy(child_start + pos + 1, child_start + pos, n_entry - pos + 1);
-  child_start[pos] = child;
+  if (n_entry - pos > 0) {
+    memcpy(child_start + pos + 2, child_start + pos + 1, n_entry - pos);
+  }
+  child_start[pos + 1] = child;
 
   SetIsDirty(true);
   SetCurrentEntries(n_entry + 1);
 }
 
-
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
+  SPDLOG_INFO("init page: page_id={}, is_leaf={}", page_id, is_leaf);
   dst->SetPageID(page_id);
   dst->SetDegree(degree);
   dst->SetCurrentEntries(n);

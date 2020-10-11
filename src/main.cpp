@@ -30,7 +30,35 @@ void test_split_insert(yedis::BTree *root) {
   assert(s.ok());
 }
 
-int main() {
+// 没有分裂, 1个leaf node
+// leaf node的容量其实和degree没什么关系
+void test_normal_insert(yedis::BTree *root) {
+  auto max = yedis::MAX_DEGREE;
+  for (int i = 0; i < max; i++) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
+// 有分裂, 2个leaf node，1个index node
+void test_small_value_split(yedis::BTree *root) {
+  auto max = 300;
+  for (int i = 0; i < max; i++) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
+// 3个leaf node， 1个index node
+void test_medium_insert(yedis::BTree *root) {
+  auto max = 500;
+  for (int i = 0; i < max; i++) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
+int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);
   spdlog::set_pattern("[source %s] [function %!] [line %#] %v");
@@ -42,43 +70,24 @@ int main() {
 //
 //  auto console = spdlog::get("console");
 //  spdlog::set_default_logger(console);
-
-  auto disk_manager = new yedis::DiskManager(kIndexFile);
+  char *index_file = const_cast<char *>(kIndexFile);
+  if (argc > 1) {
+    index_file = argv[argc - 1];
+  }
+  SPDLOG_INFO("index file is: {}", index_file);
+  auto disk_manager = new yedis::DiskManager(index_file);
   auto yInstance = new yedis::YedisInstance();
   yInstance->disk_manager = disk_manager;
   auto buffer_pool_manager = new yedis::BufferPoolManager(16, yInstance);
   yInstance->buffer_pool_manager = buffer_pool_manager;
   auto zsetIndexTree = new yedis::BTree(yInstance);
 
-  test_split_insert(zsetIndexTree);
+//  test_split_insert(zsetIndexTree);
 
-//  zsetIndexTree->add("k2]")
-//  for (int i = 9; i >= 0; i--) {
-//    std::string k = "k";
-//    std::string v = "v";
-//    zsetIndexTree->add(i, v + std::to_string(i));
-//  }
-//  {
-//    yedis::Status s;
-////    s = zsetIndexTree->add(2, "v2");
-////    assert(s.ok());
-//    s = zsetIndexTree->add(1, "v1");
-//    assert(s.ok());
-////    s = zsetIndexTree->add(3, "v1");
-////    assert(s.ok());
-//  }
+//  test_normal_insert(zsetIndexTree);
+  // test_small_value_split(zsetIndexTree);
+  test_medium_insert(zsetIndexTree);
 
-  // test for read
-//  for (int i = 0; i < 10; i++) {
-//    std::string k = "k";
-//    std::string v;
-//    auto s = zsetIndexTree->read(i, &v);
-//    if (!s.ok()) {
-//      spdlog::info("not found key={}, value={}", k + std::to_string(i));
-//      continue;
-//    }
-//    spdlog::info("found key={}, value={}", k + std::to_string(i), v);
-//  }
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();

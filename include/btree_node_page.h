@@ -26,7 +26,10 @@ namespace yedis {
     inline void SetDegree(uint32_t degree) { EncodeFixed32(GetData() + DEGREE_OFFSET, degree); }
     // set available
     inline size_t GetAvailable() { return *reinterpret_cast<size_t*>(GetData() + AVAILABLE_OFFSET); }
-    inline void SetAvailable(size_t available) { EncodeFixed32(GetData() + AVAILABLE_OFFSET, available); }
+    inline void SetAvailable(int32_t available) {
+      assert(available >= 0);
+      EncodeFixed32(GetData() + AVAILABLE_OFFSET, available);
+    }
     // is leaf node
     inline bool IsLeafNode() {
       return *reinterpret_cast<byte *>(GetData() + FLAG_OFFSET) == 0;
@@ -40,7 +43,7 @@ namespace yedis {
     }
     inline bool IsFull(size_t sz = 0) {
       if (!IsLeafNode()) {
-        return GetDegree() == MAX_DEGREE;
+        return GetCurrentEntries() >= GetDegree();
       }
       return GetAvailable() < sz;
     }
@@ -53,13 +56,12 @@ namespace yedis {
     }
     // index node
     inline int64_t GetKey(int idx) {
-      SPDLOG_INFO("GetKey idx: {}, entries: {}", idx, GetCurrentEntries());
       assert(idx < GetCurrentEntries());
       return KeyPosStart()[idx];
     }
 
     inline page_id_t * ChildPosStart() {
-      return reinterpret_cast<page_id_t *>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(page_id_t));
+      return reinterpret_cast<page_id_t *>(GetData() + KEY_POS_OFFSET + (2 * GetDegree() - 1) * sizeof(int64_t));
     }
 
     inline page_id_t GetChild(int idx) {
@@ -104,6 +106,8 @@ namespace yedis {
     void init(int degree, page_id_t page_id);
     void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
 
+    // TODO: 这里的degree不能为0
+    // TODO: 静态方法
     inline void leaf_init(BTreeNodePage* dst, int n, page_id_t page_id) {
       return init(dst, 0, n, page_id, true);
     }

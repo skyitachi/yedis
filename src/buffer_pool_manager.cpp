@@ -18,11 +18,9 @@ BufferPoolManager::~BufferPoolManager() {
 }
 
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
-  spdlog::info("FetchPage current_index_ {}, page_id {}", current_index_, page_id);
   auto it = records_.find(page_id);
   if (it != records_.end()) {
     // 当前page在内存中
-    SPDLOG_INFO("page_id: {} is current_index {}", page_id, it->second);
     return &pages_[it->second];
   }
   records_.insert(std::make_pair(page_id, current_index_));
@@ -35,7 +33,7 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
 
 Page* BufferPoolManager::NewPage(page_id_t *page_id) {
   *page_id = yedis_instance_->disk_manager->AllocatePage();
-  spdlog::info("NewPage page_id: {}", *page_id);
+  SPDLOG_INFO("NewPage page_id: {}", *page_id);
   return FetchPage(*page_id);
 }
 

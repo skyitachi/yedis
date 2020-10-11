@@ -37,15 +37,15 @@ using lsn_t = int32_t;         // log sequence number type
 using slot_offset_t = size_t;  // slot offset type
 using oid_t = uint16_t;
 
-static constexpr int MAX_DEGREE = (PAGE_SIZE - 32) / 8;
+static constexpr int MAX_DEGREE = (PAGE_SIZE - 32) / 2 / (sizeof(page_id_t) + sizeof(int64_t));
 
 // page format
 static constexpr int HEADER_SIZE = 21;
 static constexpr int PAGE_ID_OFFSET = 0;
-static constexpr int ENTRY_COUNT_OFFSET = 4;
-static constexpr int DEGREE_OFFSET = 8;
-static constexpr int AVAILABLE_OFFSET = 12;
-static constexpr int FLAG_OFFSET = 16;
+static constexpr int FLAG_OFFSET = 4;
+static constexpr int ENTRY_COUNT_OFFSET = 5;
+static constexpr int DEGREE_OFFSET = 9;
+static constexpr int AVAILABLE_OFFSET = 13;
 static constexpr int PARENT_OFFSET = 17;
 static constexpr int KEY_POS_OFFSET = 21;
 

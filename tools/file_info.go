@@ -12,13 +12,16 @@ import (
 const (
 	PAGE_SIZE            = 4096
 	MetaPageIdOffset     = 0
-	MetaRootPageIdOffset = 4
-	MetaLevelOffset      = 8
+	MetaRootPageIdOffset = 5
+	MetaLevelOffset      = 9
 
-	EntryCountOffset = 4
-	AvailableOffset  = 12
-	FlagOffset       = 16
+	FlagOffset       = 4
+	EntryCountOffset = 5
+	AvailableOffset  = 13
 	EntryOffset      = 29
+
+	DegreeOffset  = 9
+	KeyPostOffset = 21
 )
 
 type Entry struct {
@@ -34,7 +37,7 @@ func ReadEntry(reader *bytes.Reader) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("read entry key: ", key)
+	// log.Println("read entry key: ", key)
 	entry.Key = key
 	var vLen uint32
 	err = binary.Read(reader, binary.LittleEndian, &vLen)
@@ -69,7 +72,7 @@ func ReadIndexNode(reader *bytes.Reader, count int, degree int) (keys []int64, c
 		}
 		keys = append(keys, ret)
 	}
-	_, err = reader.Seek(int64((degree-count)*8), io.SeekCurrent)
+	_, err = reader.Seek(int64(KeyPostOffset+(2*degree-1)*8), io.SeekStart)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,7 +92,12 @@ func ReadIndexNode(reader *bytes.Reader, count int, degree int) (keys []int64, c
 }
 
 func main() {
-	btreeFile, err := os.Open("btree.idx")
+	idxFile := "btree.idx"
+	if len(os.Args) > 1 {
+		idxFile = os.Args[len(os.Args)-1]
+	}
+	log.Printf("index file: %s", idxFile)
+	btreeFile, err := os.Open(idxFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -125,8 +133,12 @@ func main() {
 	}
 	log.Println("levels is: ", levels)
 
-	// read root_page
-	n, err = btreeFile.ReadAt(buf, int64(root_page_id*PAGE_SIZE))
+	print_tree(root_page_id, btreeFile)
+}
+
+func print_tree(root_page_id int32, btreeFile *os.File) {
+	buf := make([]byte, PAGE_SIZE)
+	_, err := btreeFile.ReadAt(buf, int64(root_page_id*PAGE_SIZE))
 	if err != nil {
 		log.Fatalf("read root page error %+v", err)
 	}
@@ -140,36 +152,55 @@ func main() {
 	if real_page_id != root_page_id {
 		log.Fatalf("meta root_page_id=%+v, real_page_id=%+v", root_page_id, real_page_id)
 	}
+	// parse flag
+	var flag byte
+	_ = binary.Read(rootReader, binary.LittleEndian, &flag)
+
 	var entryCount int32
 	_ = binary.Read(rootReader, binary.LittleEndian, &entryCount)
 	log.Printf("root page has %+v entries\n", entryCount)
 
-	var avaiable int32
-	_, err = rootReader.Seek(4, io.SeekCurrent)
-	if err != nil {
-		log.Fatalf("Seek error %+v", err)
-	}
-	_ = binary.Read(rootReader, binary.LittleEndian, &avaiable)
-	log.Printf("available space: %+v\n", avaiable)
-
-	var flag byte
-	_ = binary.Read(rootReader, binary.LittleEndian, &flag)
 	if flag == 0 {
-		log.Printf("root node is leaf node")
+		// leaf page
+		var avaiable int32
+		_, err = rootReader.Seek(4, io.SeekCurrent)
+		if err != nil {
+			log.Fatalf("Seek error %+v", err)
+		}
+		_ = binary.Read(rootReader, binary.LittleEndian, &avaiable)
 		_, err = rootReader.Seek(12, io.SeekCurrent)
 		if err != nil {
 			log.Fatalf("read entry seek error %+v", err)
 		}
+		log.Printf("[leaf] [page_id %+v] available=%+v, entryCount=%+v", real_page_id, avaiable, entryCount)
 
-		for i := 0; i < int(entryCount); i++ {
-			entry, err := ReadEntry(rootReader)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Printf("entry value len: %+v", len(entry.Value))
-		}
-	} else {
-		log.Printf("root node is index node")
+		// for i := 0; i < int(entryCount); i++ {
+		// 	entry, err := ReadEntry(rootReader)
+		// 	if err != nil {
+		// 		log.Fatal(err)
+		// 	}
+		// 	log.Printf("[page_id %+v] entry key: %+v, entry value len: %+v", real_page_id, entry.Key, len(entry.Value))
+		// }
+		return
+	}
+	// index node
+
+	var degree int32
+	_ = binary.Read(rootReader, binary.LittleEndian, &degree)
+	// skip
+	_, err = rootReader.Seek(KeyPostOffset-AvailableOffset, io.SeekCurrent)
+	if err != nil {
+		log.Fatalf("index node skip error %+v", err)
 	}
 
+	keys, childs, err := ReadIndexNode(rootReader, int(entryCount), int(degree))
+	log.Printf("[index] [page_id %+v] degree=%+v, keys=%+v, childs=%+v", real_page_id, degree, keys, childs)
+
+	if err != nil {
+		log.Fatalf("read index node failed: %+v", err)
+	}
+
+	for i := 0; i < len(childs); i++ {
+		print_tree(childs[i], btreeFile)
+	}
 }

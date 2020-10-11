@@ -22,4 +22,6 @@ yet another rocksdb based redis, let's call it `yedis`
 - 算法４里是递归更新（从底向上分裂）
 
 #### 格式说明
-- [ ] node_page中flag需要提前，不然不好写parser
+- [x] node_page中flag需要提前，不然不好写parser
+
+#### 设计测试程序

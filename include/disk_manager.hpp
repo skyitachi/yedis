@@ -36,7 +36,7 @@ class DiskManager {
 
   std::string file_name_;
   int fd_;
-  std::atomic<page_id_t > next_page_id_;
+  std::atomic<page_id_t > next_page_id_ = 0;
 };
 }
 #endif //YEDIS_INCLUDE_DISK_MANAGER_HPP_
