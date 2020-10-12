@@ -58,6 +58,33 @@ void test_medium_insert(yedis::BTree *root) {
   }
 }
 
+// 4个leaf node， 1个index node包含4个child
+void test_large_insert(yedis::BTree *root) {
+  auto max = 700;
+  for (int i = 0; i < max; i++) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
+// 逆序插入
+void test_reverse_insert(yedis::BTree *root) {
+  auto max = 100;
+  for (int i = max; i >= 0; i--) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
+// 逆序带分裂的插入
+void test_reverse_split_insert(yedis::BTree *root) {
+  auto max = 300;
+  for (int i = max; i >= 0; i--) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);
@@ -86,7 +113,10 @@ int main(int argc, char **argv) {
 
 //  test_normal_insert(zsetIndexTree);
   // test_small_value_split(zsetIndexTree);
-  test_medium_insert(zsetIndexTree);
+  // test_medium_insert(zsetIndexTree);
+//  test_large_insert(zsetIndexTree);
+//  test_reverse_insert(zsetIndexTree);
+  test_reverse_split_insert(zsetIndexTree);
 
   yInstance->buffer_pool_manager->Flush();
 
