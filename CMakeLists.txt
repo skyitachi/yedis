@@ -12,14 +12,20 @@ ELSE()
     link_directories(/home/skyitachi/lab/rocksdb/cmake-build-release)
 ENDIF()
 
-add_subdirectory(deps/spdlog)
-add_subdirectory(deps/gtest)
 
 option(BUILD_WITH_TESTS "Build Yedis's unit tests" ON)
 
 aux_source_directory(src SOURCE_FILES)
-add_executable(yedis ${SOURCE_FILES} include/util.hpp include/page.hpp include/config.hpp include/buffer_pool_manager.hpp src/buffer_pool_manager.cpp include/btree_leaf_node_page.hpp include/disk_manager.hpp include/btree_index_node_page.hpp include/btree_meta_page.hpp include/btree_node_page.h src/btree_index_node_page.cpp src/btree_node_page.cpp)
-target_link_libraries(yedis rocksdb spdlog::spdlog gtest)
+#add_executable(yedis ${SOURCE_FILES})
+#target_link_libraries(yedis rocksdb spdlog::spdlog gtest)
 
-if (BUILD_WITH_TESTS)
-endif(BUILD_WITH_TESTS)
+add_library(yedis "")
+
+target_sources(yedis
+    PRIVATE
+        ${SOURCE_FILES}
+)
+
+add_subdirectory(tests)
+add_subdirectory(deps/spdlog)
+add_subdirectory(deps/gtest)

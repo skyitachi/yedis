@@ -1,0 +1,2 @@
+add_executable(btree_node_page_test btree_node_page_test.cpp)
+target_link_libraries(btree_node_page_test yedis spdlog::spdlog gtest)
