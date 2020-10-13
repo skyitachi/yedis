@@ -174,13 +174,13 @@ func print_tree(root_page_id int32, btreeFile *os.File) {
 		}
 		log.Printf("[leaf] [page_id %+v] available=%+v, entryCount=%+v", real_page_id, avaiable, entryCount)
 
-		// for i := 0; i < int(entryCount); i++ {
-		// 	entry, err := ReadEntry(rootReader)
-		// 	if err != nil {
-		// 		log.Fatal(err)
-		// 	}
-		// 	log.Printf("[page_id %+v] entry key: %+v, entry value len: %+v", real_page_id, entry.Key, len(entry.Value))
-		// }
+		for i := 0; i < int(entryCount); i++ {
+			entry, err := ReadEntry(rootReader)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("[page_id %+v] entry key: %+v, entry value len: %+v", real_page_id, entry.Key, len(entry.Value))
+		}
 		return
 	}
 	// index node

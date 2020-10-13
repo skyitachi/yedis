@@ -85,6 +85,17 @@ void test_reverse_split_insert(yedis::BTree *root) {
   }
 }
 
+void test_not_continuous_split_insert(yedis::BTree* root) {
+  for (int i = 0; i < 1000; i += 5) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+  for (int i = 2; i < 1000; i += 10) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    assert(s.ok());
+  }
+}
+
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);
@@ -116,8 +127,8 @@ int main(int argc, char **argv) {
   // test_medium_insert(zsetIndexTree);
 //  test_large_insert(zsetIndexTree);
 //  test_reverse_insert(zsetIndexTree);
-  test_reverse_split_insert(zsetIndexTree);
-
+//  test_reverse_split_insert(zsetIndexTree);
+  test_not_continuous_split_insert(zsetIndexTree);
   yInstance->buffer_pool_manager->Flush();
 
   yInstance->disk_manager->ShutDown();
