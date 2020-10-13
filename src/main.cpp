@@ -96,7 +96,7 @@ void test_not_continuous_split_insert(yedis::BTree* root) {
   }
 }
 
-int main(int argc, char **argv) {
+static void test_main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);
   spdlog::set_pattern("[source %s] [function %!] [line %#] %v");

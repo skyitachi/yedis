@@ -29,7 +29,7 @@ class BufferPoolManager {
   size_t pool_size_;
   YedisInstance* yedis_instance_;
   Page* pages_;
-  int current_index_;
+  int current_index_ = 0;
   std::unordered_map<page_id_t, int> records_;
 };
 }
