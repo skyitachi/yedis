@@ -64,6 +64,10 @@ TEST_F(BTreeNodePageTest, SplitInsert) {
 }
 }
 
+//TEST_F(BTreeNodePageTest, RandomInsert) {
+//
+//}
+
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);

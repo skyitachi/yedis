@@ -16,6 +16,7 @@ yet another rocksdb based redis, let's call it `yedis`
 - [x] 是否要记住当前page的父节点
 - [x] 实现search
 - [ ] leaf node需要前后指针
+- [ ] 测试util的Random和随机字符串的生成
 
 #### 分裂算法
 - 算法导论的分裂算法是在搜索路径中出现满节点的就开始分裂, 用来维护btree的平衡
