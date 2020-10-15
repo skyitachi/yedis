@@ -9,6 +9,8 @@
 #include <buffer_pool_manager.hpp>
 #include <disk_manager.hpp>
 #include <btree.hpp>
+#include <random.h>
+#include <test_util.h>
 
 namespace yedis {
 class BTreeNodePageTest : public testing::Test {
@@ -23,6 +25,7 @@ class BTreeNodePageTest : public testing::Test {
     root = new BTree(yedis_instance_);
   }
   BTree *root;
+  Random* rnd = new Random();
 
   void Flush() {
     yedis_instance_->buffer_pool_manager->Flush();
@@ -48,6 +51,7 @@ class BTreeNodePageTest : public testing::Test {
   YedisInstance *yedis_instance_;
 };
 
+
 TEST_F(BTreeNodePageTest, NormalInsert) {
   for (int i = 0; i <= 10; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
@@ -62,11 +66,24 @@ TEST_F(BTreeNodePageTest, SplitInsert) {
     ASSERT_TRUE(s.ok());
   }
 }
+
+TEST_F(BTreeNodePageTest, RandomInsert) {
+  std::unordered_map<int64_t, std::string*> presets_;
+  int limit = 30;
+  for (int i = 0; i <= limit; i++) {
+    auto key = rnd->NextInt64();
+    std::string* s = new std::string();
+    test::RandomString(rnd, rnd->IntN(100) + 1, s);
+    presets_.insert(std::pair(key, s));
+  }
+  for(const auto it: presets_) {
+    auto s = root->add(it.first, *it.second);
+    ASSERT_TRUE(s.ok());
+  }
 }
 
-//TEST_F(BTreeNodePageTest, RandomInsert) {
-//
-//}
+}
+
 
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
@@ -75,5 +92,5 @@ int main(int argc, char **argv) {
 
   testing::InitGoogleTest(&argc, argv);
 
-  return RUN_ALL_TESTS();
+   return RUN_ALL_TESTS();
 }

@@ -40,7 +40,16 @@ Status BTreeNodePage::read(int64_t key, std::string *result) {
 }
 
 Status BTreeNodePage::read(const byte *key, std::string *result) {
-  return Status::NotSupported();
+  // 不带分裂的搜索
+  // auto target_leaf_page = search(key, value, v_len, root);
+  auto it = this;
+  while (!it->IsLeafNode()) {
+    int64_t* key_start = it->KeyPosStart();
+    int n_keys = it->GetCurrentEntries();
+    auto child_start = it->ChildPosStart();
+    auto key_end = key_start + n_keys;
+    auto result = std::lower_bound(key_start, key_end, key);
+  }
 }
 
 // 搜索改key对应的leaf node, 默认是从根结点向下搜索
@@ -66,9 +75,9 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       }
     }
     // TODO: ignore duplicate key
-    int64_t* key_start = KeyPosStart();
-    int n_keys = GetCurrentEntries();
-    auto child_start = ChildPosStart();
+    int64_t* key_start = it->KeyPosStart();
+    int n_keys = it->GetCurrentEntries();
+    auto child_start = it->ChildPosStart();
     auto key_end = key_start + n_keys;
     auto result = std::lower_bound(key_start, key_end, key);
     parent = it;

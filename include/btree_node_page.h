@@ -99,8 +99,11 @@ namespace yedis {
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
     Status add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
     Status read(const byte *key, std::string *result);
+    // 必须是root结点出发
     Status read(int64_t key, std::string* result);
+    // 带分裂的搜索
     BTreeNodePage * search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
+
 
 //    virtual void init(int degree, page_id_t page_id);
     void init(int degree, page_id_t page_id);
