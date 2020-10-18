@@ -101,6 +101,7 @@ namespace yedis {
     Status read(const byte *key, std::string *result);
     // 必须是root结点出发
     Status read(int64_t key, std::string* result);
+    Status read(BufferPoolManager*, int64_t, std::string *result);
     // 带分裂的搜索
     BTreeNodePage * search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
 
@@ -117,6 +118,9 @@ namespace yedis {
     // insert kv pair to leaf node
     Status leaf_insert(int64_t key, const byte* value, int32_t v_len);
 
+    // leaf node search key
+    Status leaf_search(int64_t key, std::string *dst);
+
     class EntryIterator {
      public:
       EntryIterator(char *ptr): data_(ptr) {}
@@ -125,9 +129,10 @@ namespace yedis {
       EntryIterator& operator ++();
       EntryIterator& operator ++(int);
       int64_t key() const;
-      size_t size() const;
-      size_t value_size() const;
-      bool ValueLessThan(const byte* value, size_t v_len);
+      int32_t size() const;
+      int32_t value_size() const;
+      Slice value() const;
+      bool ValueLessThan(const byte* value, int32_t v_len);
       char *data_;
     };
     BTreeNodePage* NewLeafPage(BufferPoolManager*, int cnt, const EntryIterator& start, const EntryIterator& end);

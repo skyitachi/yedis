@@ -39,7 +39,7 @@ class BTreeNodePageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown");
     Flush();
     ShutDown();
-    root->destroy();
+//    root->destroy();
     delete buffer_pool_manager_;
     delete disk_manager_;
     delete yedis_instance_;
@@ -57,6 +57,12 @@ TEST_F(BTreeNodePageTest, NormalInsert) {
     auto s = root->add(i, "v" + std::to_string(i));
     ASSERT_TRUE(s.ok());
   }
+  for (int i = 0; i < 10; i++) {
+    std::string tmp;
+    auto s = root->read(i, &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, "v" + std::to_string(i));
+  }
 }
 
 TEST_F(BTreeNodePageTest, SplitInsert) {
@@ -64,6 +70,12 @@ TEST_F(BTreeNodePageTest, SplitInsert) {
   for (int i = 0; i <= limit; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
     ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(i, &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, "v" + std::to_string(i));
   }
 }
 
@@ -76,9 +88,38 @@ TEST_F(BTreeNodePageTest, RandomInsert) {
     test::RandomString(rnd, rnd->IntN(100) + 1, s);
     presets_.insert(std::pair(key, s));
   }
-  for(const auto it: presets_) {
+  for (const auto it: presets_) {
     auto s = root->add(it.first, *it.second);
     ASSERT_TRUE(s.ok());
+  }
+  for (const auto it: presets_) {
+    std::string tmp;
+    auto s = root->read(it.first, &tmp);
+    ASSERT_EQ(tmp, *it.second);
+  }
+}
+
+TEST_F(BTreeNodePageTest, RandomBigInsert) {
+  std::unordered_map<int64_t, std::string*> presets_;
+  int limit = 300;
+  for (int i = 0; i <= limit; i++) {
+    auto key = rnd->NextInt64();
+    std::string* s = new std::string();
+    test::RandomString(rnd, rnd->IntN(100) + 1, s);
+    presets_.insert(std::pair(key, s));
+  }
+  for (const auto it: presets_) {
+    auto s = root->add(it.first, *it.second);
+    ASSERT_TRUE(s.ok());
+  }
+  for (const auto it: presets_) {
+    std::string tmp;
+    auto s = root->read(it.first, &tmp);
+    if (!s.ok()) {
+      SPDLOG_INFO("expected key = {}, value = {}", it.first, *it.second);
+    }
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *it.second);
   }
 }
 

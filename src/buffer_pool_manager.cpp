@@ -26,11 +26,11 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   }
   records_.insert(std::make_pair(page_id, current_index_));
   Page *next_page = &pages_[current_index_];
-  SPDLOG_INFO("before read page: current_index_: {}", current_index_);
   SPDLOG_INFO("before read page: {}, current_index_: {}", next_page->GetPageId(), current_index_);
   yedis_instance_->disk_manager->ReadPage(page_id, next_page->GetData());
   auto next_index = (current_index_ + 1) % pool_size_;
   current_index_ = next_index;
+  next_page->SetPageID(page_id);
   SPDLOG_INFO("after read page, page_id: {}", next_page->GetPageId());
 
   return next_page;

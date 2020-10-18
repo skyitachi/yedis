@@ -32,7 +32,7 @@ Status BTree::add(int64_t key, const Slice& value) {
 }
 
 Status BTree::read(int64_t key, std::string *value) {
-  return root_->read(key, value);
+  return root_->read(yedis_instance_->buffer_pool_manager, key, value);
 }
 
 Status BTree::init() {

@@ -28,6 +28,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 }
 
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
+  SPDLOG_INFO("[{}], root page_id {}", key, GetPageID());
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
   SPDLOG_INFO("key={}, search leaf page: {}, successfully", key, target_leaf_page->GetPageID());
@@ -35,25 +36,33 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   return s;
 }
 
+Status BTreeNodePage::read(const byte* key, std::string *result) {
+  return Status::NotSupported();
+}
+
 Status BTreeNodePage::read(int64_t key, std::string *result) {
   return Status::NotSupported();
 }
 
-Status BTreeNodePage::read(const byte *key, std::string *result) {
-  // 不带分裂的搜索
-  // auto target_leaf_page = search(key, value, v_len, root);
+Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, std::string *result) {
   auto it = this;
   while (!it->IsLeafNode()) {
     int64_t* key_start = it->KeyPosStart();
     int n_keys = it->GetCurrentEntries();
     auto child_start = it->ChildPosStart();
     auto key_end = key_start + n_keys;
-    auto result = std::lower_bound(key_start, key_end, key);
+    auto found = std::lower_bound(key_start, key_end, key);
+    auto pos = found - key_start;
+    assert(pos <= it->GetCurrentEntries());
+    it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
   }
+  assert(it->IsLeafNode());
+  return it->leaf_search(key, result);
 }
 
 // 搜索改key对应的leaf node, 默认是从根结点向下搜索
 // NOTE: 暂时只考虑不重复key的情况
+// buffer_pool_manager的依赖如何管理
 BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   assert(root != nullptr);
   auto total_len = v_len + sizeof(int64_t) + sizeof(int32_t);
@@ -61,10 +70,10 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   auto it = this;
   BTreeNodePage* parent = nullptr;
   int pos = 0;
-//  SPDLOG_INFO("search to index node: key={}, page_id={}", key, it->GetPageID());
+  SPDLOG_INFO("search to index node: key={}, page_id={}", key, it->GetPageID());
   while(!it->IsLeafNode()) {
     if (it->IsFull()) {
-      SPDLOG_INFO("found index node={} full", it->GetPageID());
+      SPDLOG_INFO("[{}] found index node={} full", key, it->GetPageID());
       if (*root == this) {
         // 当前index node就是根节点
         auto new_root = index_split(buffer_pool_manager, nullptr, 0);
@@ -79,17 +88,19 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     int n_keys = it->GetCurrentEntries();
     auto child_start = it->ChildPosStart();
     auto key_end = key_start + n_keys;
+    SPDLOG_INFO("[{}] page_id: {}, key: {}, n_keys: {}, degree: {}", key, it->GetPageID(), key, n_keys, it->GetDegree());
     auto result = std::lower_bound(key_start, key_end, key);
     parent = it;
     if (result != key_end) {
       // found
       pos = result - key_start;
       spdlog::debug("key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
-      it =  reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
+      it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
     } else {
       // key 最大
       pos = n_keys;
       spdlog::debug("biggest key: key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
+      assert(child_start[pos] != 0);
       it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
     }
   }
@@ -160,7 +171,6 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   // new index page
   // new leaf node page
   auto mid_key = it.key();
-  // TODO: mid_key的更新有问题
   SPDLOG_INFO("mid key: {}, count: {}", mid_key, count);
   it++;
   auto new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
@@ -199,13 +209,16 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
     offset += it.size();
   }
   auto total_len = sizeof(key) + sizeof(int32_t) + v_len;
-  SPDLOG_INFO("key={}, offset={}, available={}, entry_tail= {}, move size= {}", key, offset, GetAvailable(), GetEntryTail(), GetEntryTail() - offset);
+  SPDLOG_INFO("[page_id {}] key={}, offset={}, available={}, entry_tail= {}, move size= {}", GetPageID(), key, offset, GetAvailable(), GetEntryTail(), GetEntryTail() - offset);
   memcpy(entry_pos_start + offset + total_len, entry_pos_start + offset, GetEntryTail() - offset);
 
   // write value
   auto pos_start = entry_pos_start + offset;
+  // write key
   EncodeFixed64(pos_start, key);
+  // write v_len
   EncodeFixed32(pos_start + sizeof(int64_t), v_len);
+  // write value
   memcpy(pos_start + sizeof(int64_t) + sizeof(int32_t), value, v_len);
 
   // update entry count
@@ -215,6 +228,23 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
   SetAvailable(GetAvailable() - total_len);
   SetIsDirty(true);
   return Status::OK();
+}
+
+Status BTreeNodePage::leaf_search(int64_t target, std::string *dst) {
+  assert(IsLeafNode());
+  int n_entries = GetCurrentEntries();
+  SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
+  auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
+  BTreeNodeIter start(entry_pos_start);
+  BTreeNodeIter end(entry_pos_start + GetEntryTail());
+  for (auto it = start; it != end; it++) {
+    if (it.key() == target) {
+      SPDLOG_INFO("key: {}, value_size: {}", target, it.value_size());
+      dst->assign(it.value().data(), it.value_size());
+      return Status::OK();
+    }
+  }
+  return Status::NotFound();
 }
 
 // TODO: should be static method
@@ -273,20 +303,35 @@ BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BufferPoolManager* buffer_pool_ma
 // TODO: 还需要考虑乱序插入情况
 void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) {
   assert(pos >= 0);
-  SPDLOG_INFO("key_pos={}, key={}, child={}", pos, key, child);
   auto key_start = KeyPosStart();
   auto n_entry = GetCurrentEntries();
+  SPDLOG_INFO("[page_id {}] key_pos={}, key={}, n_entries = {}, child_page_id={}", GetPageID(), pos, key, n_entry, child);
   memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
   key_start[pos]= key;
 
   auto child_start = ChildPosStart();
+  SPDLOG_INFO("before change: [page_id {}] last_child={}", GetPageID(), child_start[n_entry]);
+  for (int i = 0; i <= n_entry; i++) {
+    printf("%d ", child_start[i]);
+  }
+  printf("\n");
   if (n_entry - pos > 0) {
-    memcpy(child_start + pos + 2, child_start + pos + 1, n_entry - pos);
+    // pos + 1 往后移动一个
+    // overlap
+    for (auto j = n_entry; j >= pos + 1; j--) {
+      child_start[j + 1] = child_start[j];
+    }
+//    memmove(child_start + pos + 2, child_start + pos + 1, n_entry - pos);
   }
   child_start[pos + 1] = child;
 
   SetIsDirty(true);
   SetCurrentEntries(n_entry + 1);
+  printf("after change ----------------------------\n");
+  for (int i = 0; i <= n_entry + 1; i++) {
+    printf("%d ", child_start[i]);
+  }
+  printf("\n");
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
@@ -317,17 +362,17 @@ int64_t BTreeNodePage::EntryIterator::key() const {
   return DecodeFixed64(data_);
 }
 
-size_t BTreeNodeIter::size() const {
-  return sizeof(int64_t) + 4 + value_size();
+int32_t BTreeNodeIter::size() const {
+  return sizeof(int64_t) + sizeof(int32_t) + value_size();
 }
 
-size_t BTreeNodeIter::value_size() const {
+int32_t BTreeNodeIter::value_size() const {
   return DecodeFixed32(data_ + sizeof(int64_t));
 }
 
-bool BTreeNodeIter::ValueLessThan(const byte *target, size_t v_len) {
+bool BTreeNodeIter::ValueLessThan(const byte *target, int32_t v_len) {
   size_t min_len = std::min(v_len, value_size());
-  auto value = data_ + sizeof(int64_t) + 4;
+  auto value = data_ + sizeof(int64_t) + sizeof(int32_t);
   int ret = std::memcmp(value, target, min_len);
   if (ret < 0) {
     return true;
@@ -338,6 +383,10 @@ bool BTreeNodeIter::ValueLessThan(const byte *target, size_t v_len) {
     return false;
   }
   return false;
+}
+
+Slice BTreeNodeIter::value() const {
+  return Slice(data_ + sizeof(int64_t) + sizeof(int32_t), value_size());
 }
 
 }
