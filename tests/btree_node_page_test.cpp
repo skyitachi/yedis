@@ -26,6 +26,7 @@ class BTreeNodePageTest : public testing::Test {
   }
   BTree *root;
   Random* rnd = new Random();
+  int counter = 0;
 
   void Flush() {
     yedis_instance_->buffer_pool_manager->Flush();
@@ -36,7 +37,7 @@ class BTreeNodePageTest : public testing::Test {
   }
 
   void TearDown() override {
-    SPDLOG_INFO("gtest teardown");
+    SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
 //    root->destroy();
@@ -106,7 +107,9 @@ TEST_F(BTreeNodePageTest, RandomBigInsert) {
     auto key = rnd->NextInt64();
     std::string* s = new std::string();
     test::RandomString(rnd, rnd->IntN(100) + 1, s);
-    presets_.insert(std::pair(key, s));
+    if (presets_.find(key) == presets_.end()) {
+      presets_.insert(std::pair(key, s));
+    }
   }
   for (const auto it: presets_) {
     auto s = root->add(it.first, *it.second);
@@ -120,6 +123,7 @@ TEST_F(BTreeNodePageTest, RandomBigInsert) {
     }
     ASSERT_TRUE(s.ok());
     ASSERT_EQ(tmp, *it.second);
+    counter++;
   }
 }
 

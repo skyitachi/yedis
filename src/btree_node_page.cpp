@@ -46,7 +46,9 @@ Status BTreeNodePage::read(int64_t key, std::string *result) {
 
 Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, std::string *result) {
   auto it = this;
+  std::vector<page_id_t> path;
   while (!it->IsLeafNode()) {
+    path.push_back(it->GetPageID());
     int64_t* key_start = it->KeyPosStart();
     int n_keys = it->GetCurrentEntries();
     auto child_start = it->ChildPosStart();
@@ -57,6 +59,12 @@ Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, 
     it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
   }
   assert(it->IsLeafNode());
+  path.push_back(it->GetPageID());
+  printf("[%lld] read search path: ---------------------\n", key);
+  for(auto p: path) {
+    printf(" %d", p);
+  }
+  printf("\n");
   return it->leaf_search(key, result);
 }
 
@@ -71,7 +79,9 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   BTreeNodePage* parent = nullptr;
   int pos = 0;
   SPDLOG_INFO("search to index node: key={}, page_id={}", key, it->GetPageID());
+  std::vector<page_id_t > path;
   while(!it->IsLeafNode()) {
+    path.push_back(it->GetPageID());
     if (it->IsFull()) {
       SPDLOG_INFO("[{}] found index node={} full", key, it->GetPageID());
       if (*root == this) {
@@ -105,6 +115,12 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     }
   }
   if (it->IsFull(total_len)) {
+    path.push_back(it->GetPageID());
+    printf("add search path: ---------------------\n");
+    for(auto p: path) {
+      printf(" %d", p);
+    }
+    printf("\n");
     SPDLOG_DEBUG("page {} leaf node is full", it->GetPageID());
     auto new_root = it->leaf_split(buffer_pool_manager, parent, pos);
     if (*root != nullptr) {
@@ -132,6 +148,12 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
   }
   // leaf node没有满直接返回
+  path.push_back(it->GetPageID());
+  printf("add search path: ---------------------\n");
+  for(auto p: path) {
+    printf(" %d", p);
+  }
+  printf("\n");
   return it;
 }
 
@@ -306,9 +328,21 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) 
   auto key_start = KeyPosStart();
   auto n_entry = GetCurrentEntries();
   SPDLOG_INFO("[page_id {}] key_pos={}, key={}, n_entries = {}, child_page_id={}", GetPageID(), pos, key, n_entry, child);
-  memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
+  printf("before key change: \n");
+  for (int i = 0; i < n_entry; i++) {
+    printf(" %lld", key_start[i]);
+  }
+  printf("\n");
+  for (int j = n_entry - 1; j >= pos + 1; j--) {
+    key_start[j + 1] = key_start[j];
+  }
+//  memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
   key_start[pos]= key;
-
+  printf("after key change: \n");
+  for (int i = 0; i <= n_entry; i++) {
+    printf(" %lld", key_start[i]);
+  }
+  printf("------------------------\n");
   auto child_start = ChildPosStart();
   SPDLOG_INFO("before change: [page_id {}] last_child={}", GetPageID(), child_start[n_entry]);
   for (int i = 0; i <= n_entry; i++) {
