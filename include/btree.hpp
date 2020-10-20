@@ -22,35 +22,8 @@ struct Entry {
   inline size_t size() { return 9 + key_len + value_len; }
 };
 
-// 继承page
-class BTreeNode {
-  public:
-    BTreeNode(): t_(MAX_DEGREE){
-      n_current_entry_ = 0;
-      flag_ = 0;
-    }
-    BTreeNode(int t): t_(t){}
-    Status add(byte* key, byte* value);
-  private:
-    // entries
-    int n_current_entry_;
-    // degree
-    int t_;
-    // leaf node flag
-    byte flag_;
-    // key pos
-    int64_t *keyPos_;
-    // child pos
-    int64_t *childPos_;
-    // node offset in file;
-    int64_t offset_;
-    Entry* entries_;
-    // Page
-};
-
 class BTreeLeafNodePage;
 class BTreeMetaPage;
-class BTreeIndexNodePage;
 class BTreeNodePage;
 class YedisInstance;
 class BTree {
@@ -62,7 +35,11 @@ class BTree {
   Status add(int64_t key, const Slice &value);
   Status read(int64_t key, std::string *value);
   Status destroy();
+  page_id_t GetFirstLeafPage();
+  std::vector<page_id_t> GetAllLeavesByPointer();
+  std::vector<page_id_t> GetAllLeavesByIterate();
  private:
+  inline BTreeNodePage* get_page(page_id_t page_id);
   BTreeMetaPage* meta_;
   BTreeLeafNodePage * leaf_root_;
   BTreeNodePage *root_;

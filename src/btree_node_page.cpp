@@ -13,9 +13,11 @@ using BTreeNodeIter = BTreeNodePage::EntryIterator;
 
 void BTreeNodePage::init(int degree, page_id_t page_id) {
   // 没有初始化过的一定是leaf node
+  // TODO: 这个判断条件明显不准
   if (GetAvailable() == 0) {
     SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE);
     SetIsDirty(true);
+    SetPrevPageID(INVALID_PAGE_ID);
     assert(GetAvailable() == PAGE_SIZE - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
@@ -79,9 +81,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   BTreeNodePage* parent = nullptr;
   int pos = 0;
   SPDLOG_INFO("search to index node: key={}, page_id={}", key, it->GetPageID());
-  std::vector<page_id_t > path;
   while(!it->IsLeafNode()) {
-    path.push_back(it->GetPageID());
     if (it->IsFull()) {
       SPDLOG_INFO("[{}] found index node={} full", key, it->GetPageID());
       if (*root == this) {
@@ -115,12 +115,6 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     }
   }
   if (it->IsFull(total_len)) {
-    path.push_back(it->GetPageID());
-    printf("add search path: ---------------------\n");
-    for(auto p: path) {
-      printf(" %d", p);
-    }
-    printf("\n");
     SPDLOG_DEBUG("page {} leaf node is full", it->GetPageID());
     auto new_root = it->leaf_split(buffer_pool_manager, parent, pos);
     if (*root != nullptr) {
@@ -148,12 +142,6 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
   }
   // leaf node没有满直接返回
-  path.push_back(it->GetPageID());
-  printf("add search path: ---------------------\n");
-  for(auto p: path) {
-    printf(" %d", p);
-  }
-  printf("\n");
   return it;
 }
 
@@ -199,6 +187,10 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   // update entries and count
   SetCurrentEntries(count);
   SetAvailable(GetAvailable() + (end.data_ - it.data_));
+
+  // update pointers
+  SetNextPageID(new_leaf_page->GetPageID());
+  new_leaf_page->SetPrevPageID(GetPageID());
 
   SPDLOG_INFO("after split available={}", GetAvailable());
   if (parent == nullptr) {
@@ -283,6 +275,7 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
   memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
   next_page->SetIsDirty(true);
   next_page->SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE - copied_sz);
+  next_page->SetNextPageID(INVALID_PAGE_ID);
   return next_page;
 }
 
@@ -333,7 +326,7 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) 
     printf(" %lld", key_start[i]);
   }
   printf("\n");
-  for (int j = n_entry - 1; j >= pos + 1; j--) {
+  for (int j = n_entry - 1; j >= pos; j--) {
     key_start[j + 1] = key_start[j];
   }
 //  memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
@@ -422,6 +415,7 @@ bool BTreeNodeIter::ValueLessThan(const byte *target, int32_t v_len) {
 Slice BTreeNodeIter::value() const {
   return Slice(data_ + sizeof(int64_t) + sizeof(int32_t), value_size());
 }
+
 
 }
 

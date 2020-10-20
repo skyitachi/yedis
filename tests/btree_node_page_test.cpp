@@ -127,7 +127,22 @@ TEST_F(BTreeNodePageTest, RandomBigInsert) {
   }
 }
 
+TEST_F(BTreeNodePageTest, LeafNodePrevAndNextTest) {
+  auto limit = 1000;
+  for (int i = 0; i < limit; i++) {
+    auto s = root->add(i, "v" + std::to_string(i));
+    ASSERT_TRUE(s.ok());
+  }
+  auto all_child_by_pointers = root->GetAllLeavesByPointer();
+  auto all_child_by_iterate = root->GetAllLeavesByIterate();
+  ASSERT_TRUE(all_child_by_iterate.size() == all_child_by_pointers.size());
+  for (int i = 0; i < all_child_by_pointers.size(); i++) {
+    ASSERT_TRUE(all_child_by_pointers.at(i) == all_child_by_iterate.at(i));
+  }
 }
+
+}
+
 
 
 int main(int argc, char **argv) {
