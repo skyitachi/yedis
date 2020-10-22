@@ -15,10 +15,10 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
   // 没有初始化过的一定是leaf node
   // TODO: 这个判断条件明显不准
   if (GetAvailable() == 0) {
-    SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE);
+    SetAvailable(options_.page_size - LEAF_HEADER_SIZE);
     SetIsDirty(true);
     SetPrevPageID(INVALID_PAGE_ID);
-    assert(GetAvailable() == PAGE_SIZE - LEAF_HEADER_SIZE);
+    assert(GetAvailable() == options_.page_size - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
   // degree is needed
@@ -274,7 +274,7 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
   // NOTE: 应该从entry start开始复制
   memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
   next_page->SetIsDirty(true);
-  next_page->SetAvailable(PAGE_SIZE - LEAF_HEADER_SIZE - copied_sz);
+  next_page->SetAvailable(options_.page_size - LEAF_HEADER_SIZE - copied_sz);
   next_page->SetNextPageID(INVALID_PAGE_ID);
   return next_page;
 }
@@ -315,50 +315,23 @@ BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BufferPoolManager* buffer_pool_ma
   return new_page;
 }
 
-// TODO: 还需要考虑乱序插入情况
 void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) {
   assert(pos >= 0);
   auto key_start = KeyPosStart();
   auto n_entry = GetCurrentEntries();
   SPDLOG_INFO("[page_id {}] key_pos={}, key={}, n_entries = {}, child_page_id={}", GetPageID(), pos, key, n_entry, child);
-  printf("before key change: \n");
-  for (int i = 0; i < n_entry; i++) {
-    printf(" %ld", key_start[i]);
-  }
-  printf("\n");
-  for (int j = n_entry - 1; j >= pos; j--) {
-    key_start[j + 1] = key_start[j];
-  }
-//  memcpy(key_start + pos + 1, key_start + pos, n_entry - pos + 1);
+  // NOTE: 这个问题居然看了好久, 居然是size的问题...
+  memmove(key_start + pos + 1, key_start + pos, (n_entry - pos) * sizeof(int64_t));
   key_start[pos]= key;
-  printf("after key change: \n");
-  for (int i = 0; i <= n_entry; i++) {
-    printf(" %ld", key_start[i]);
-  }
-  printf("------------------------\n");
+  // 移动child
   auto child_start = ChildPosStart();
-  SPDLOG_INFO("before change: [page_id {}] last_child={}", GetPageID(), child_start[n_entry]);
-  for (int i = 0; i <= n_entry; i++) {
-    printf("%d ", child_start[i]);
-  }
-  printf("\n");
   if (n_entry - pos > 0) {
-    // pos + 1 往后移动一个
-    // overlap
-    for (auto j = n_entry; j >= pos + 1; j--) {
-      child_start[j + 1] = child_start[j];
-    }
-//    memmove(child_start + pos + 2, child_start + pos + 1, n_entry - pos);
+    memmove(child_start + pos + 2, child_start + pos + 1, (n_entry - pos) * sizeof(page_id_t));
   }
   child_start[pos + 1] = child;
 
   SetIsDirty(true);
   SetCurrentEntries(n_entry + 1);
-  printf("after change ----------------------------\n");
-  for (int i = 0; i <= n_entry + 1; i++) {
-    printf("%d ", child_start[i]);
-  }
-  printf("\n");
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {

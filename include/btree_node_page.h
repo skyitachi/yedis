@@ -93,6 +93,7 @@ namespace yedis {
     }
     // only leaf node needs
     inline size_t GetEntryTail() {
+      SPDLOG_INFO("current page_size: {}, available: {}", options_.page_size, GetAvailable());
       return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
     // interface
