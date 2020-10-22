@@ -26,3 +26,5 @@ yet another rocksdb based redis, let's call it `yedis`
 - [x] node_page中flag需要提前，不然不好写parser
 
 #### 设计测试程序
+- [x] random inseret
+- [ ] small page_size test
