@@ -8,6 +8,7 @@
 #include "yedis.hpp"
 #include "config.hpp"
 #include "yedis_zset.hpp"
+#include "option.hpp"
 
 namespace yedis {
 

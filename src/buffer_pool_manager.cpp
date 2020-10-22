@@ -9,12 +9,30 @@ namespace yedis {
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance) {
   assert(pool_size != 0);
   pool_size_ = pool_size;
-  pages_ = new Page[pool_size];
+  raw_memory_ = operator new(pool_size * sizeof(Page));
+  pages_ = reinterpret_cast<Page*>(operator new(pool_size * sizeof(Page)));
+  for (int i = 0; i < pool_size; i++) {
+    new(&pages_[i])Page();
+  }
+  yedis_instance_ = yedis_instance;
+}
+
+BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance, BTreeOptions options) {
+  assert(pool_size != 0);
+  pool_size_ = pool_size;
+  // placement new initialize
+  pages_ = reinterpret_cast<Page*>(operator new(pool_size * sizeof(Page)));
+  for (int i = 0; i < pool_size; i++) {
+    new(&pages_[i])Page(options);
+  }
   yedis_instance_ = yedis_instance;
 }
 
 BufferPoolManager::~BufferPoolManager() {
-  delete []pages_;
+  for (int i = 0; i < pool_size_; i++) {
+    pages_[i].~Page();
+  }
+  operator delete(raw_memory_);
 }
 
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
@@ -31,7 +49,7 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   auto next_index = (current_index_ + 1) % pool_size_;
   current_index_ = next_index;
   next_page->SetPageID(page_id);
-  SPDLOG_INFO("after read page, page_id: {}", next_page->GetPageId());
+  SPDLOG_INFO("after read page, page_id: {}, page_size: {}", next_page->GetPageId(), next_page->getPageSize());
 
   return next_page;
 }

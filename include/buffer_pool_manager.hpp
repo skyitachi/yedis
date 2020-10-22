@@ -11,11 +11,14 @@
 #include "yedis.hpp"
 #include "disk_manager.hpp"
 
+#include "option.hpp"
+
 namespace yedis {
 
 class BufferPoolManager {
  public:
   BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance);
+  BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance, BTreeOptions options);
 
   ~BufferPoolManager();
 
@@ -31,6 +34,7 @@ class BufferPoolManager {
   Page* pages_;
   int current_index_ = 0;
   std::unordered_map<page_id_t, int> records_;
+  void *raw_memory_;
 };
 }
 #endif //YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_

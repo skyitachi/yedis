@@ -11,12 +11,15 @@
 #include <string>
 
 #include "config.hpp"
+#include "option.hpp"
 
 namespace yedis {
 
 class DiskManager {
  public:
-  explicit DiskManager(const std::string& db_file);
+  DiskManager(const std::string& db_file, BTreeOptions options);
+
+  explicit DiskManager(const std::string& db_file): DiskManager(db_file, BTreeOptions{}) {};
 
   ~DiskManager() = default;
 
@@ -37,6 +40,7 @@ class DiskManager {
   std::string file_name_;
   int fd_;
   std::atomic<page_id_t > next_page_id_ = 0;
+  BTreeOptions options_;
 };
 }
 #endif //YEDIS_INCLUDE_DISK_MANAGER_HPP_

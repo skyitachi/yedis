@@ -11,7 +11,8 @@
 #include <unistd.h>
 
 namespace yedis {
-  DiskManager::DiskManager(const std::string &db_file) {
+  DiskManager::DiskManager(const std::string &db_file, BTreeOptions options) {
+    options_ = options;
     file_name_ = db_file;
     fd_ = open(db_file.c_str(), O_RDWR | O_CREAT, 0644);
     if (fd_ < 0) {
@@ -21,15 +22,15 @@ namespace yedis {
   }
 
   void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
-    lseek(fd_, page_id * PAGE_SIZE, SEEK_SET);
-    read(fd_, page_data, PAGE_SIZE);
+    lseek(fd_, page_id * options_.page_size, SEEK_SET);
+    read(fd_, page_data, options_.page_size);
   }
 
   void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
-    lseek(fd_, page_id * PAGE_SIZE, SEEK_SET);
-    spdlog::info("write to disk data: page_id {}, page_size {}, db file: {}", page_id, PAGE_SIZE, file_name_);
-    int written = write(fd_, page_data, PAGE_SIZE);
-    if (written != PAGE_SIZE) {
+    lseek(fd_, page_id * options_.page_size, SEEK_SET);
+    spdlog::info("write to disk data: page_id {}, page_size {}, db file: {}", page_id, options_.page_size, file_name_);
+    int written = write(fd_, page_data, options_.page_size);
+    if (written != options_.page_size) {
       spdlog::error("write to disk error, written {} data", written);
     } else {
       spdlog::info("write success");

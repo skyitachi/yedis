@@ -62,7 +62,7 @@ Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, 
   }
   assert(it->IsLeafNode());
   path.push_back(it->GetPageID());
-  printf("[%lld] read search path: ---------------------\n", key);
+  printf("[%ld] read search path: ---------------------\n", key);
   for(auto p: path) {
     printf(" %d", p);
   }
@@ -323,7 +323,7 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) 
   SPDLOG_INFO("[page_id {}] key_pos={}, key={}, n_entries = {}, child_page_id={}", GetPageID(), pos, key, n_entry, child);
   printf("before key change: \n");
   for (int i = 0; i < n_entry; i++) {
-    printf(" %lld", key_start[i]);
+    printf(" %ld", key_start[i]);
   }
   printf("\n");
   for (int j = n_entry - 1; j >= pos; j--) {
@@ -333,7 +333,7 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, page_id_t child) 
   key_start[pos]= key;
   printf("after key change: \n");
   for (int i = 0; i <= n_entry; i++) {
-    printf(" %lld", key_start[i]);
+    printf(" %ld", key_start[i]);
   }
   printf("------------------------\n");
   auto child_start = ChildPosStart();

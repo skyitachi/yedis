@@ -93,7 +93,7 @@ namespace yedis {
     }
     // only leaf node needs
     inline size_t GetEntryTail() {
-      return PAGE_SIZE - GetAvailable() - LEAF_HEADER_SIZE;
+      return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
     // interface
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);

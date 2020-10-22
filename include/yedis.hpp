@@ -6,6 +6,9 @@
 #define YEDIS_INCLUDE_YEDIS_HPP_
 #include <string>
 #include <rocksdb/db.h>
+
+#include "option.hpp"
+
 namespace yedis {
 using Status = rocksdb::Status;
 struct ScoreMember {

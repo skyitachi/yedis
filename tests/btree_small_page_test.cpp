@@ -1,7 +1,6 @@
 //
-// Created by admin on 2020/10/13.
+// Created by skyitachi on 2020/10/22.
 //
-
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 
@@ -13,14 +12,16 @@
 #include <test_util.h>
 
 namespace yedis {
-class BTreeNodePageTest : public testing::Test {
+class BTreeSmallPageTest : public testing::Test {
  protected:
   void SetUp() override {
     SPDLOG_INFO("gtest setup");
-    disk_manager_ = new DiskManager("btree_node_page_test.idx");
+    BTreeOptions options;
+    options.page_size = 128;
+    disk_manager_ = new DiskManager("btree_node_page_test.idx", options);
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;
-    buffer_pool_manager_ = new BufferPoolManager(16, yedis_instance_);
+    buffer_pool_manager_ = new BufferPoolManager(16, yedis_instance_, options);
     yedis_instance_->buffer_pool_manager = buffer_pool_manager_;
     root = new BTree(yedis_instance_);
   }
@@ -40,7 +41,7 @@ class BTreeNodePageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    root->destroy();
+//    root->destroy();
     delete buffer_pool_manager_;
     delete disk_manager_;
     delete yedis_instance_;
@@ -53,7 +54,7 @@ class BTreeNodePageTest : public testing::Test {
 };
 
 
-TEST_F(BTreeNodePageTest, NormalInsert) {
+TEST_F(BTreeSmallPageTest, NormalInsert) {
   for (int i = 0; i <= 10; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
     ASSERT_TRUE(s.ok());
@@ -66,7 +67,7 @@ TEST_F(BTreeNodePageTest, NormalInsert) {
   }
 }
 
-TEST_F(BTreeNodePageTest, SplitInsert) {
+TEST_F(BTreeSmallPageTest, SplitInsert) {
   int limit = 300;
   for (int i = 0; i <= limit; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
@@ -80,7 +81,7 @@ TEST_F(BTreeNodePageTest, SplitInsert) {
   }
 }
 
-TEST_F(BTreeNodePageTest, RandomInsert) {
+TEST_F(BTreeSmallPageTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 30;
   for (int i = 0; i <= limit; i++) {
@@ -100,7 +101,7 @@ TEST_F(BTreeNodePageTest, RandomInsert) {
   }
 }
 
-TEST_F(BTreeNodePageTest, RandomBigInsert) {
+TEST_F(BTreeSmallPageTest, RandomBigInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 300;
   for (int i = 0; i <= limit; i++) {
@@ -126,8 +127,7 @@ TEST_F(BTreeNodePageTest, RandomBigInsert) {
     counter++;
   }
 }
-
-TEST_F(BTreeNodePageTest, LeafNodePrevAndNextTest) {
+TEST_F(BTreeSmallPageTest, LeafNodePrevAndNextTest) {
   auto limit = 1000;
   for (int i = 0; i < limit; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
@@ -150,5 +150,6 @@ int main(int argc, char **argv) {
 
   testing::InitGoogleTest(&argc, argv);
 
-   return RUN_ALL_TESTS();
+  return RUN_ALL_TESTS();
 }
+
