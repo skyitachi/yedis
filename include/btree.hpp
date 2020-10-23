@@ -29,9 +29,10 @@ class BTreeNodePage;
 class YedisInstance;
 class BTree {
  public:
-  BTree(YedisInstance* yedis_instance): yedis_instance_(yedis_instance) {
+  BTree(YedisInstance* yedis_instance, BTreeOptions options): yedis_instance_(yedis_instance), options_(options) {
     init();
-  };
+  }
+  BTree(YedisInstance* yedis_instance): BTree(yedis_instance, BTreeOptions{}) {}
   Status init();
   Status add(int64_t key, const Slice &value);
   Status read(int64_t key, std::string *value);
@@ -46,6 +47,7 @@ class BTree {
   BTreeNodePage *root_;
   std::string file_name_;
   YedisInstance* yedis_instance_;
+  BTreeOptions options_;
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_NODE_HPP_

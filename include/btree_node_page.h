@@ -51,6 +51,11 @@ namespace yedis {
     inline page_id_t GetParentPageID() {
       return *reinterpret_cast<page_id_t*>(GetData() + PARENT_OFFSET);
     }
+    // set parent id
+    inline void SetParentPageID(page_id_t parent) {
+      EncodeFixed32(GetData() + PARENT_OFFSET, parent);
+    }
+
     inline int64_t* KeyPosStart() {
       return reinterpret_cast<int64_t *>(GetData() + KEY_POS_OFFSET);
     }
@@ -93,7 +98,7 @@ namespace yedis {
     }
     // only leaf node needs
     inline size_t GetEntryTail() {
-      SPDLOG_INFO("current page_size: {}, available: {}", options_.page_size, GetAvailable());
+      SPDLOG_INFO("page_id: {}, current page_size: {}, available: {}", GetPageID(), options_.page_size, GetAvailable());
       return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
     // interface

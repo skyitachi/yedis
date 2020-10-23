@@ -16,7 +16,6 @@ class BTreeSmallPageTest : public testing::Test {
  protected:
   void SetUp() override {
     SPDLOG_INFO("gtest setup");
-    BTreeOptions options;
     options.page_size = 128;
     disk_manager_ = new DiskManager("btree_node_page_test.idx", options);
     yedis_instance_ = new YedisInstance();
@@ -27,6 +26,7 @@ class BTreeSmallPageTest : public testing::Test {
   }
   BTree *root;
   Random* rnd = new Random();
+  BTreeOptions options;
   int counter = 0;
 
   void Flush() {
@@ -42,6 +42,7 @@ class BTreeSmallPageTest : public testing::Test {
     Flush();
     ShutDown();
 //    root->destroy();
+    delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
     delete yedis_instance_;
@@ -87,7 +88,7 @@ TEST_F(BTreeSmallPageTest, RandomInsert) {
   for (int i = 0; i <= limit; i++) {
     auto key = rnd->NextInt64();
     std::string* s = new std::string();
-    test::RandomString(rnd, rnd->IntN(100) + 1, s);
+    test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, s);
     presets_.insert(std::pair(key, s));
   }
   for (const auto it: presets_) {
@@ -107,7 +108,7 @@ TEST_F(BTreeSmallPageTest, RandomBigInsert) {
   for (int i = 0; i <= limit; i++) {
     auto key = rnd->NextInt64();
     std::string* s = new std::string();
-    test::RandomString(rnd, rnd->IntN(100) + 1, s);
+    test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, s);
     if (presets_.find(key) == presets_.end()) {
       presets_.insert(std::pair(key, s));
     }

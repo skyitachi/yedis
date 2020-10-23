@@ -54,7 +54,7 @@ Status BTree::init() {
     meta_->SetRootPageId(root_page_id);
     meta_->SetLevels(1);
     spdlog::debug("meta_ level: {}", meta_->GetLevels());
-    root_->init(MAX_DEGREE, root_page_id);
+    root_->init(get_degree(options_.page_size), root_page_id);
     return Status::OK();
   }
   auto root_page_id = meta_->GetRootPageId();

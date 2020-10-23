@@ -30,10 +30,10 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 }
 
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
-  SPDLOG_INFO("[{}], root page_id {}", key, GetPageID());
+  SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
-  SPDLOG_INFO("key={}, search leaf page: {}, successfully", key, target_leaf_page->GetPageID());
+  SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
   return s;
 }
@@ -155,8 +155,11 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
   auto new_index_page = NewIndexPageFrom(buffer_pool_manager, this, n_entries / 2 + 1);
   if (parent == nullptr) {
     auto new_root = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_index_page->GetPageID());
+    SetParentPageID(new_root->GetPageID());
+    new_index_page->SetParentPageID(new_root->GetPageID());
     return new_root;
   }
+  new_index_page->SetParentPageID(parent->GetPageID());
   parent->index_node_add_child(child_idx, mid_key, new_index_page->GetPageID());
   return nullptr;
 }
@@ -192,9 +195,16 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   SetNextPageID(new_leaf_page->GetPageID());
   new_leaf_page->SetPrevPageID(GetPageID());
 
-  SPDLOG_INFO("after split available={}", GetAvailable());
+  if (parent != nullptr) {
+    SetParentPageID(parent->GetPageID());
+    new_leaf_page->SetParentPageID(parent->GetPageID());
+  }
+
+  SPDLOG_INFO("page_id={}, after split available={}", GetPageID(), GetAvailable());
   if (parent == nullptr) {
     auto new_index_page = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_leaf_page->GetPageID());
+    SetParentPageID(new_index_page->GetPageID());
+    new_leaf_page->SetParentPageID(new_leaf_page->GetPageID());
     return new_index_page;
   }
   // parent添加child
