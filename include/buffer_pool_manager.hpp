@@ -6,6 +6,8 @@
 #define YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_
 
 #include <unordered_map>
+#include <vector>
+#include <spdlog/spdlog.h>
 
 #include "page.hpp"
 #include "yedis.hpp"
@@ -28,6 +30,18 @@ class BufferPoolManager {
   Page *NewPage(page_id_t* page_id);
 
   Status Flush();
+
+  // debug
+  std::vector<page_id_t> GetAllBTreePageID() {
+    auto ret = std::vector<page_id_t>();
+    for (auto [page_id, _]: records_) {
+      if (page_id != 0) {
+        SPDLOG_INFO("memory recorded page_id {}", page_id);
+        ret.push_back(page_id);
+      }
+    }
+    return ret;
+  }
  private:
   size_t pool_size_;
   YedisInstance* yedis_instance_;

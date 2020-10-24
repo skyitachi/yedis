@@ -69,9 +69,12 @@ TEST_F(BTreeSmallPageTest, NormalInsert) {
 }
 
 TEST_F(BTreeSmallPageTest, SplitInsert) {
-  int limit = 300;
+  int limit = 10;
+  std::string* big_value = new std::string();
+
+  test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, big_value);
   for (int i = 0; i <= limit; i++) {
-    auto s = root->add(i, "v" + std::to_string(i));
+    auto s = root->add(i, *big_value);
     ASSERT_TRUE(s.ok());
   }
   for (int i = 0; i < limit; i++) {
@@ -79,6 +82,22 @@ TEST_F(BTreeSmallPageTest, SplitInsert) {
     auto s = root->read(i, &tmp);
     ASSERT_TRUE(s.ok());
     ASSERT_EQ(tmp, "v" + std::to_string(i));
+  }
+}
+
+TEST_F(BTreeSmallPageTest, Debug) {
+  int64_t keys[] = {912266655898828170, 5649222723178894915};
+  int limit = 2;
+  std::string* big_value = new std::string();
+  test::RandomString(rnd, 41, big_value);
+
+  std::string *v2 = new std::string();
+  test::RandomString(rnd, 24, big_value);
+
+  std::string* values[] = {big_value, v2};
+  for (int i = 0; i <= limit; i++) {
+    auto s = root->add(keys[i], *values[i]);
+    ASSERT_TRUE(s.ok());
   }
 }
 

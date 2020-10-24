@@ -19,7 +19,9 @@ namespace yedis {
       ResetMemory();
     }
     Page(): Page(BTreeOptions{}) {}
-    ~Page() = default;
+    ~Page() {
+      delete data_;
+    };
 
     inline char *GetData() { return data_; }
 

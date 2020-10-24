@@ -10,7 +10,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_inst
   assert(pool_size != 0);
   pool_size_ = pool_size;
   raw_memory_ = operator new(pool_size * sizeof(Page));
-  pages_ = reinterpret_cast<Page*>(operator new(pool_size * sizeof(Page)));
+  pages_ = reinterpret_cast<Page*>(raw_memory_);
   for (int i = 0; i < pool_size; i++) {
     new(&pages_[i])Page();
   }
@@ -20,8 +20,9 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_inst
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance, BTreeOptions options) {
   assert(pool_size != 0);
   pool_size_ = pool_size;
+  raw_memory_ = operator new(pool_size * sizeof(Page));
   // placement new initialize
-  pages_ = reinterpret_cast<Page*>(operator new(pool_size * sizeof(Page)));
+  pages_ = reinterpret_cast<Page*>(raw_memory_);
   for (int i = 0; i < pool_size; i++) {
     new(&pages_[i])Page(options);
   }

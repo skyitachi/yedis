@@ -25,9 +25,8 @@ namespace yedis {
     inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
     inline void SetDegree(uint32_t degree) { EncodeFixed32(GetData() + DEGREE_OFFSET, degree); }
     // set available
-    inline size_t GetAvailable() { return *reinterpret_cast<size_t*>(GetData() + AVAILABLE_OFFSET); }
-    inline void SetAvailable(int32_t available) {
-      assert(available >= 0);
+    inline uint32_t GetAvailable() { return *reinterpret_cast<uint32_t*>(GetData() + AVAILABLE_OFFSET); }
+    inline void SetAvailable(uint32_t available) {
       EncodeFixed32(GetData() + AVAILABLE_OFFSET, available);
     }
     // is leaf node
@@ -98,7 +97,6 @@ namespace yedis {
     }
     // only leaf node needs
     inline size_t GetEntryTail() {
-      SPDLOG_INFO("page_id: {}, current page_size: {}, available: {}", GetPageID(), options_.page_size, GetAvailable());
       return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
     // interface
@@ -127,6 +125,7 @@ namespace yedis {
     // leaf node search key
     Status leaf_search(int64_t key, std::string *dst);
 
+    void debug_available(BufferPoolManager*); 
     class EntryIterator {
      public:
       EntryIterator(char *ptr): data_(ptr) {}

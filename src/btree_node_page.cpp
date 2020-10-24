@@ -116,7 +116,10 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   }
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
+    debug_available(buffer_pool_manager);
     auto new_root = it->leaf_split(buffer_pool_manager, parent, pos);
+    SPDLOG_INFO("after leaf_split");
+    debug_available(buffer_pool_manager);
     if (*root != nullptr) {
       //　update root
       SPDLOG_INFO("root not null root page_id: {}", (*root)->GetPageID());
@@ -131,17 +134,20 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       parent = *root;
     }
     assert(parent != nullptr);
-    SPDLOG_INFO("new_root={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
-    SPDLOG_INFO("pos: {}, index key: {}, first key: {}", pos, parent->GetKey(pos), parent->GetKey(0));
+    debug_available(buffer_pool_manager);
+    SPDLOG_INFO("root page_id={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
+    SPDLOG_INFO("root page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
+    SPDLOG_INFO("current_key = {}, pos_key = {}", key, parent->GetKey(pos));
     if (key < parent->GetKey(pos)) {
       auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
       SPDLOG_INFO("target leaf node page_id: {}, available={}", parent->GetChild(pos), child_page->GetAvailable());
       return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
     }
+    debug_available(buffer_pool_manager);
     // 只有在第一次leaf node 分裂的情况下才会出现
     auto child_page_id = parent->GetChild(pos + 1);
     auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
-    SPDLOG_INFO("target leaf node page_id: {}, available={}", child_page_id, child_page->GetAvailable());
+    SPDLOG_INFO("[{}] target leaf node page_id: {}, available={}", key, child_page_id, child_page->GetAvailable());
     return child_page;
   }
   // leaf node没有满直接返回
@@ -152,6 +158,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
 BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager, BTreeNodePage* parent, int child_idx) {
   auto key_start = KeyPosStart();
   int n_entries = GetCurrentEntries();
+  SPDLOG_INFO("page_id {}, n_entries = {}", GetPageID(), n_entries);
   assert(n_entries >= 2);
   auto mid_key  = key_start[n_entries / 2];
   // 需要将right部分的数据迁移到新的index node上
@@ -190,6 +197,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   SPDLOG_INFO("mid key: {}, count: {}", mid_key, count);
   it++;
   auto new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
+  assert(new_leaf_page->IsLeafNode());
   // update entries and count
   SetCurrentEntries(count);
   SetAvailable(GetAvailable() + (end.data_ - it.data_));
@@ -205,11 +213,17 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
 
   SPDLOG_INFO("page_id={}, after split available={}", GetPageID(), GetAvailable());
   SPDLOG_INFO("after split: new_page_id={}, available={}", new_leaf_page->GetPageID(), new_leaf_page->GetAvailable());
+  SPDLOG_INFO("before debug: -------------------------------");
+  debug_available(buffer_pool_manager);
+  SPDLOG_INFO("end debug: --------------------------------");
 
   if (parent == nullptr) {
     auto new_index_page = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_leaf_page->GetPageID());
+    SPDLOG_INFO("after new index page: --------------------------------");
+    debug_available(buffer_pool_manager);
+    SPDLOG_INFO("end debug: --------------------------------");
     SetParentPageID(new_index_page->GetPageID());
-    new_leaf_page->SetParentPageID(new_leaf_page->GetPageID());
+    new_leaf_page->SetParentPageID(new_index_page->GetPageID());
     return new_index_page;
   }
   // parent添加child
@@ -291,6 +305,7 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
   next_page->SetIsDirty(true);
   next_page->SetAvailable(options_.page_size - LEAF_HEADER_SIZE - copied_sz);
   next_page->SetNextPageID(INVALID_PAGE_ID);
+  next_page->SetLeafNode(true);
   return next_page;
 }
 
@@ -410,6 +425,17 @@ Slice BTreeNodeIter::value() const {
   return Slice(data_ + sizeof(int64_t) + sizeof(int32_t), value_size());
 }
 
+void BTreeNodePage::debug_available(BufferPoolManager* buffer_pool) {
+  for (auto page_id: buffer_pool->GetAllBTreePageID()) {
+    auto btree_page = reinterpret_cast<BTreeNodePage*>(buffer_pool->FetchPage(page_id));
+    assert(btree_page->GetPageID() == page_id);
+    if (!btree_page->IsLeafNode()) {
+      SPDLOG_INFO("root page_id={}, childs = {}", page_id, btree_page->GetCurrentEntries());
+    } else {
+      SPDLOG_INFO("leaf page_id={}, keys = {}, available = {}", page_id, btree_page->GetCurrentEntries(), btree_page->GetAvailable());
+    }
+  }
+}
 
 }
 
