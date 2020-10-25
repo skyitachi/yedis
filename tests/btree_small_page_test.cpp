@@ -86,17 +86,15 @@ TEST_F(BTreeSmallPageTest, SplitInsert) {
 }
 
 TEST_F(BTreeSmallPageTest, Debug) {
-  int64_t keys[] = {912266655898828170, 5649222723178894915};
-  int limit = 2;
-  std::string* big_value = new std::string();
-  test::RandomString(rnd, 41, big_value);
+  int64_t keys[] = {3, 5, 2, 4, 1};
+  int lens[] = {60, 61, 13, 52, 44};
+  int limit = 5;
 
-  std::string *v2 = new std::string();
-  test::RandomString(rnd, 24, big_value);
-
-  std::string* values[] = {big_value, v2};
-  for (int i = 0; i <= limit; i++) {
-    auto s = root->add(keys[i], *values[i]);
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
     ASSERT_TRUE(s.ok());
   }
 }

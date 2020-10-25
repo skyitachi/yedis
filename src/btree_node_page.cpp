@@ -252,7 +252,6 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
     offset += it.size();
   }
   auto total_len = sizeof(key) + sizeof(int32_t) + v_len;
-  SPDLOG_INFO("[page_id {}] key={}, offset={}, available={}, entry_tail= {}, move size= {}", GetPageID(), key, offset, GetAvailable(), GetEntryTail(), GetEntryTail() - offset);
   memcpy(entry_pos_start + offset + total_len, entry_pos_start + offset, GetEntryTail() - offset);
 
   // write value
@@ -270,6 +269,7 @@ Status BTreeNodePage::leaf_insert(int64_t key, const byte *value, int32_t v_len)
   // update available size
   SetAvailable(GetAvailable() - total_len);
   SetIsDirty(true);
+  SPDLOG_INFO("[page_id {}] key={}, offset={}, available={}, entry_tail= {}, move size= {}", GetPageID(), key, offset, GetAvailable(), GetEntryTail(), GetEntryTail() - offset);
   return Status::OK();
 }
 

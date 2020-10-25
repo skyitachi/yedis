@@ -37,7 +37,7 @@ BufferPoolManager::~BufferPoolManager() {
 }
 
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
-  SPDLOG_INFO("FetchPage page_id: {}", page_id);
+//  SPDLOG_INFO("FetchPage page_id: {}", page_id);
   auto it = records_.find(page_id);
   if (it != records_.end()) {
     // 当前page在内存中
@@ -45,12 +45,12 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   }
   records_.insert(std::make_pair(page_id, current_index_));
   Page *next_page = &pages_[current_index_];
-  SPDLOG_INFO("before read page: {}, current_index_: {}", next_page->GetPageId(), current_index_);
+//  SPDLOG_INFO("before read page: {}, current_index_: {}", next_page->GetPageId(), current_index_);
   yedis_instance_->disk_manager->ReadPage(page_id, next_page->GetData());
   auto next_index = (current_index_ + 1) % pool_size_;
   current_index_ = next_index;
   next_page->SetPageID(page_id);
-  SPDLOG_INFO("after read page, page_id: {}, page_size: {}", next_page->GetPageId(), next_page->getPageSize());
+//  SPDLOG_INFO("after read page, page_id: {}, page_size: {}", next_page->GetPageId(), next_page->getPageSize());
 
   return next_page;
 }
