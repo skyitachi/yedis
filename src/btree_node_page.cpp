@@ -117,7 +117,8 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
     debug_available(buffer_pool_manager);
-    auto new_root = it->leaf_split(buffer_pool_manager, parent, pos);
+    // TODO: 当一页只有一个数据的时候，且要插入的key小于该key的时候会有问题, 分裂的时候要把新key加入父结点的childs上
+    auto new_root = it->leaf_split(buffer_pool_manager, key, parent, pos);
     SPDLOG_INFO("after leaf_split");
     debug_available(buffer_pool_manager);
     if (*root != nullptr) {
@@ -175,7 +176,7 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
 }
 
 // 返回new root
-BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, BTreeNodePage* parent, int child_idx) {
+BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, int64_t new_key, BTreeNodePage* parent, int child_idx) {
   assert(IsLeafNode());
   int n_entries = GetCurrentEntries();
   SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
@@ -217,8 +218,17 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   debug_available(buffer_pool_manager);
   SPDLOG_INFO("end debug: --------------------------------");
 
+  // just one entry in one page
+  page_id_t right = new_leaf_page->GetPageID();
+  page_id_t left = GetPageID();
+  if (n_entries == 1 && new_key < start.key()) {
+    SPDLOG_INFO("meet the special case");
+    left = new_leaf_page->GetPageID();
+    right = GetPageID();
+    mid_key = new_key;
+  }
   if (parent == nullptr) {
-    auto new_index_page = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_leaf_page->GetPageID());
+    auto new_index_page = NewIndexPage(buffer_pool_manager, 1, mid_key, left, right);
     SPDLOG_INFO("after new index page: --------------------------------");
     debug_available(buffer_pool_manager);
     SPDLOG_INFO("end debug: --------------------------------");
@@ -229,6 +239,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   // parent添加child
   // TODO:先不考虑有重复key的情况
   assert(child_idx >= 0);
+  // NOTE: always new_leaf_page
   parent->index_node_add_child(child_idx, mid_key, new_leaf_page->GetPageID());
 
   return nullptr;

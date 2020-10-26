@@ -25,7 +25,11 @@ namespace yedis {
     inline int GetDegree() { return *reinterpret_cast<int *>(GetData() + DEGREE_OFFSET); }
     inline void SetDegree(uint32_t degree) { EncodeFixed32(GetData() + DEGREE_OFFSET, degree); }
     // set available
-    inline uint32_t GetAvailable() { return *reinterpret_cast<uint32_t*>(GetData() + AVAILABLE_OFFSET); }
+    inline uint32_t GetAvailable() {
+      auto av = *reinterpret_cast<uint32_t*>(GetData() + AVAILABLE_OFFSET);
+      assert(av <= options_.page_size);
+      return av;
+    }
     inline void SetAvailable(uint32_t available) {
       EncodeFixed32(GetData() + AVAILABLE_OFFSET, available);
     }
@@ -148,7 +152,7 @@ namespace yedis {
       return GetAvailable();
     }
     BTreeNodePage* index_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
-    BTreeNodePage* leaf_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
+    BTreeNodePage* leaf_split(BufferPoolManager*, int64_t new_key, BTreeNodePage* parent, int child_idx);
     void index_node_add_child(int pos, int64_t key, page_id_t child);
   };
 }
