@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	PAGE_SIZE            = 4096
+	// PAGE_SIZE            = 4096
+	PAGE_SIZE            = 128
 	MetaPageIdOffset     = 0
 	MetaRootPageIdOffset = 5
 	MetaLevelOffset      = 9

@@ -152,8 +152,8 @@ namespace yedis {
       return GetAvailable();
     }
     BTreeNodePage* index_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
-    BTreeNodePage* leaf_split(BufferPoolManager*, int64_t new_key, BTreeNodePage* parent, int child_idx);
-    void index_node_add_child(int pos, int64_t key, page_id_t child);
+    BTreeNodePage* leaf_split(BufferPoolManager*, int64_t new_key, BTreeNodePage* parent, int child_idx, int *ret_child_pos);
+    void index_node_add_child(int key_pos, int64_t key, int child_pos, page_id_t child);
   };
 }
 
