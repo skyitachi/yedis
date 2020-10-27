@@ -86,8 +86,8 @@ TEST_F(BTreeSmallPageTest, SplitInsert) {
 }
 
 TEST_F(BTreeSmallPageTest, Debug) {
-  int64_t keys[] = {3, 5, 2, 4, 1};
-  int lens[] = {60, 61, 13, 52, 44};
+  int64_t keys[] = {2, 1, 3, 5, 4};
+  int lens[] = {7, 59, 36, 5, 59};
   int limit = 5;
 
   for (int i = 0; i < limit; i++) {
@@ -109,6 +109,7 @@ TEST_F(BTreeSmallPageTest, RandomInsert) {
     presets_.insert(std::pair(key, s));
   }
   for (const auto it: presets_) {
+    SPDLOG_INFO("to insert key: {}, v_len: {}", it.first, it.second->size());
     auto s = root->add(it.first, *it.second);
     ASSERT_TRUE(s.ok());
   }
