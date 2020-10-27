@@ -159,7 +159,7 @@ func print_tree(root_page_id int32, btreeFile *os.File) {
 
 	var entryCount int32
 	_ = binary.Read(rootReader, binary.LittleEndian, &entryCount)
-	log.Printf("root page has %+v entries\n", entryCount)
+	log.Printf("[page_id %v] root page has %+v entries\n", root_page_id, entryCount)
 
 	if flag == 0 {
 		// leaf page

@@ -119,8 +119,9 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     // debug_available(buffer_pool_manager);
     // TODO: 当一页只有一个数据的时候，且要插入的key小于该key的时候会有问题, 分裂的时候要把新key加入父结点的childs上
     int child_pos = pos + 1;
+    SPDLOG_INFO("before leaf_split child_pos = {}", child_pos);
     auto new_root = it->leaf_split(buffer_pool_manager, key, parent, pos, &child_pos);
-    SPDLOG_INFO("after leaf_split");
+    SPDLOG_INFO("after leaf_split child_pos = {}", child_pos);
     // debug_available(buffer_pool_manager);
     if (*root != nullptr) {
       //　update root
@@ -376,11 +377,11 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, pa
   key_start[pos]= key;
   // 移动child
   auto child_start = ChildPosStart();
-  if (n_entry - pos > 0) {
-    // TODO: check
-    memmove(child_start + child_pos + 1, child_start + child_pos + 1, (n_entry - child_pos + 1) * sizeof(page_id_t));
-  }
   // TODO: 这里有问题
+  if (n_entry - pos >= 0) {
+    // TODO: check
+    memmove(child_start + child_pos + 1, child_start + child_pos, (n_entry - child_pos + 1) * sizeof(page_id_t));
+  }
   child_start[child_pos] = child;
 
   SetIsDirty(true);
