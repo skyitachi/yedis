@@ -13,9 +13,6 @@
 namespace yedis {
 
 Status BTree::add(int64_t key, const Slice& value) {
-  if (root_ != nullptr) {
-    // 判断应该在哪个叶子节点上
-  }
   Status s;
   auto origin_root = root_;
   s = root_->add(yedis_instance_->buffer_pool_manager, key, reinterpret_cast<const byte *>(value.data()), value.size(), &root_);

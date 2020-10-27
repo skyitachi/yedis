@@ -103,6 +103,11 @@ namespace yedis {
     inline size_t GetEntryTail() {
       return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
+    
+    inline uint32_t MaxAvaiable() {
+      return options_.page_size - LEAF_HEADER_SIZE;
+    }
+
     // interface
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
     Status add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
@@ -152,7 +157,7 @@ namespace yedis {
       return GetAvailable();
     }
     BTreeNodePage* index_split(BufferPoolManager*, BTreeNodePage* parent, int child_idx);
-    BTreeNodePage* leaf_split(BufferPoolManager*, int64_t new_key, BTreeNodePage* parent, int child_idx, int *ret_child_pos);
+    BTreeNodePage* leaf_split(BufferPoolManager*, int64_t new_key, uint32_t total_size, BTreeNodePage* parent, int child_idx, int *ret_child_pos);
     void index_node_add_child(int key_pos, int64_t key, int child_pos, page_id_t child);
   };
 }

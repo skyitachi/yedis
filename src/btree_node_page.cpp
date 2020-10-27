@@ -33,6 +33,8 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
+  assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvaiable());
+
   SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
   return s;
@@ -120,7 +122,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     // TODO: 当一页只有一个数据的时候，且要插入的key小于该key的时候会有问题, 分裂的时候要把新key加入父结点的childs上
     int child_pos = pos + 1;
     SPDLOG_INFO("before leaf_split child_pos = {}", child_pos);
-    auto new_root = it->leaf_split(buffer_pool_manager, key, parent, pos, &child_pos);
+    auto new_root = it->leaf_split(buffer_pool_manager, key, total_len, parent, pos, &child_pos);
     SPDLOG_INFO("after leaf_split child_pos = {}", child_pos);
     // debug_available(buffer_pool_manager);
     if (*root != nullptr) {
@@ -180,7 +182,9 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
 }
 
 // 返回new root, 设置child pos的位置
-BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, int64_t new_key, BTreeNodePage* parent, int child_idx, int *ret_child_pos) {
+// TODO: 这里的分裂算法有点问题, 以mid-key分裂不能保证新节点有足够空间容纳下一个元素的空间
+// 新key有可能插入老节点，这里还要判断老节点分裂之后能否容下新key
+BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, int64_t new_key, uint32_t total_size, BTreeNodePage* parent, int child_idx, int *ret_child_pos) {
   assert(IsLeafNode());
   int n_entries = GetCurrentEntries();
   SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
@@ -189,10 +193,15 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   BTreeNodeIter end(entry_pos_start + GetEntryTail());
   int count = 0;
   auto it = start;
+  auto sz = 0;
+  auto used = MaxAvaiable() - GetAvailable();
   // 寻找mid
   for (int i = 0; i < n_entries; i++, it++) {
     count++;
-    if (count >= n_entries / 2) {
+    used -= it.size();
+    // 剩下的空间要足够容纳一个value
+    if (count >= n_entries / 2 && used + total_size <= MaxAvaiable()) {
+      // 这里保证新节点有足够空间容纳新key
       break;
     }
   }
