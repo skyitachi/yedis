@@ -129,6 +129,28 @@ TEST_F(BTreeSmallPageTest, DebugFixedCase2) {
   }
 }
 
+TEST_F(BTreeSmallPageTest, DebugFixedCase3) {
+  int64_t keys[] = {2, 1, 3, 5, 4};
+  int lens[] = {7, 59, 36, 5, 59};
+  int limit = 5;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
 TEST_F(BTreeSmallPageTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 30;
