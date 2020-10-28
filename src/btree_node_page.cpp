@@ -143,14 +143,15 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     SPDLOG_INFO("root page_id={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
     SPDLOG_INFO("root page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
     SPDLOG_INFO("current_key = {}, pos_key = {}", key, parent->GetKey(pos));
-    if (key < parent->GetKey(pos)) {
+    // NOTE: important
+    if (key <= parent->GetKey(pos)) {
       auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
       SPDLOG_INFO("target leaf node page_id: {}, available={}", parent->GetChild(pos), child_page->GetAvailable());
       return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
     }
 //    debug_available(buffer_pool_manager);
     // 只有在第一次leaf node 分裂的情况下才会出现
-    // NOTE: child pos 不应定是pos + 1
+    // NOTE: child pos 不一定是pos + 1
     auto child_page_id = parent->GetChild(child_pos);
     auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
     assert(child_page->IsLeafNode());
@@ -192,33 +193,205 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   BTreeNodeIter start(entry_pos_start);
   BTreeNodeIter end(entry_pos_start + GetEntryTail());
   int count = 0;
+  int64_t mid_key;
+  BTreeNodePage *new_leaf_page = nullptr;
   auto it = start;
+  auto prev_key = it.key();
   auto sz = 0;
   auto used = MaxAvaiable() - GetAvailable();
+  std::vector<int64_t > child_keys;
+  std::vector<page_id_t> child_page_ids;
+  page_id_t right;
+  page_id_t left;
   // 寻找mid
   for (int i = 0; i < n_entries; i++, it++) {
-    count++;
-    used -= it.size();
-    // 剩下的空间要足够容纳一个value
-    if (count >= n_entries / 2 && used + total_size <= MaxAvaiable()) {
-      // 这里保证新节点有足够空间容纳新key
+    // 不考虑key重复的情况
+    if (new_key < it.key()) {
       break;
+    } else {
+      sz += it.size();
+      count++;
+    }
+    prev_key = it.key();
+  }
+  if (sz == 0) {
+    // new_key is smallest
+    mid_key = new_key;
+    new_leaf_page = NewLeafPage(buffer_pool_manager, 0, it, it);
+    left = new_leaf_page->GetPageID();
+    child_keys.push_back(mid_key);
+    child_page_ids.push_back(left);
+    child_page_ids.push_back(GetPageID());
+
+    *ret_child_pos = child_idx;
+    auto child_pos = child_idx;
+    // prev & next
+    // 这里能正确反映插入顺序
+    new_leaf_page->SetPrevPageID(GetPrevPageID());
+    new_leaf_page->SetNextPageID(GetPageID());
+    SetPrevPageID(new_leaf_page->GetPageID());
+
+    if (parent != nullptr) {
+      SetParentPageID(parent->GetPageID());
+      new_leaf_page->SetParentPageID(parent->GetPageID());
+      assert(child_idx >= 0);
+      // NOTE: always new_leaf_page
+      parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
+      return nullptr;
+    } else {
+      auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+//    SPDLOG_INFO("after new index page: --------------------------------");
+//    debug_available(buffer_pool_manager);
+//    SPDLOG_INFO("end debug: --------------------------------");
+      SetParentPageID(new_index_page->GetPageID());
+      new_leaf_page->SetParentPageID(new_index_page->GetPageID());
+      return new_index_page;
+    }
+  } else if (sz == used) {
+    // new_key is biggest
+    mid_key = prev_key;
+    new_leaf_page = NewLeafPage(buffer_pool_manager, 0, it, it);
+    child_keys.push_back(mid_key);
+    child_page_ids.push_back(GetPageID());
+    child_page_ids.push_back(new_leaf_page->GetPageID());
+
+    *ret_child_pos = child_idx;
+    auto child_pos = child_idx + 1;
+
+    // prev & next
+    new_leaf_page->SetPrevPageID(GetPageID());
+    new_leaf_page->SetNextPageID(GetNextPageID());
+    SetNextPageID(new_leaf_page->GetPageID());
+
+    if (parent != nullptr) {
+      SetParentPageID(parent->GetPageID());
+      new_leaf_page->SetParentPageID(parent->GetPageID());
+      assert(child_idx >= 0);
+      // NOTE: always new_leaf_page
+      parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
+      return nullptr;
+    } else {
+      auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+      SetParentPageID(new_index_page->GetPageID());
+      new_leaf_page->SetParentPageID(new_index_page->GetPageID());
+      return new_index_page;
+    }
+  } else {
+    if (sz + total_size <= MaxAvaiable())  {
+      // 放入前一个node上
+      mid_key = new_key;
+      // right page
+      new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
+      // 先不插入，所以count不会加一
+      SetCurrentEntries(count);
+
+      child_keys.push_back(mid_key);
+      child_page_ids.push_back(GetPageID());
+      child_page_ids.push_back(new_leaf_page->GetPageID());
+
+      SetAvailable(MaxAvaiable() - sz);
+      new_leaf_page->SetPrevPageID(GetPageID());
+      new_leaf_page->SetNextPageID(GetNextPageID());
+      SetNextPageID(new_leaf_page->GetPageID());
+
+      *ret_child_pos = child_idx;
+      auto child_pos = child_idx + 1;
+      if (parent != nullptr) {
+        SetParentPageID(parent->GetPageID());
+        new_leaf_page->SetParentPageID(parent->GetPageID());
+        assert(child_idx >= 0);
+        // NOTE: always new_leaf_page
+        parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
+        return nullptr;
+      } else {
+        auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        SetParentPageID(new_index_page->GetPageID());
+        new_leaf_page->SetParentPageID(new_index_page->GetPageID());
+        return new_index_page;
+      }
+
+    } else if (used - sz + total_size <= MaxAvaiable()) {
+      // 放入后一个node中
+      mid_key = prev_key;
+
+
+      // right page
+      new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
+      SetCurrentEntries(count);
+      SetAvailable(MaxAvaiable() - sz);
+
+      child_keys.push_back(mid_key);
+      child_page_ids.push_back(GetPageID());
+      child_page_ids.push_back(new_leaf_page->GetPageID());
+
+      new_leaf_page->SetPrevPageID(GetPageID());
+      new_leaf_page->SetNextPageID(GetNextPageID());
+      SetNextPageID(new_leaf_page->GetPageID());
+
+      *ret_child_pos = child_idx;
+      auto child_pos = child_idx + 1;
+
+      if (parent != nullptr) {
+        SetParentPageID(parent->GetPageID());
+        new_leaf_page->SetParentPageID(parent->GetPageID());
+        assert(child_idx >= 0);
+        // NOTE: always new_leaf_page
+        parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
+        return nullptr;
+      } else {
+        auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        SetParentPageID(new_index_page->GetPageID());
+        new_leaf_page->SetParentPageID(new_index_page->GetPageID());
+        return new_index_page;
+      }
+
+    } else {
+      // 只能新建一个page来存储new_key
+      // 要插入两个page
+      auto single_page = NewLeafPage(buffer_pool_manager, 0, it, it);
+      assert(single_page->IsLeafNode());
+      new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
+      SetCurrentEntries(count);
+      SetAvailable(MaxAvaiable() - sz);
+
+      child_keys.push_back(prev_key);
+      child_keys.push_back(new_key);
+
+      child_page_ids.push_back(GetPageID());
+      child_page_ids.push_back(single_page->GetPageID());
+      child_page_ids.push_back(new_leaf_page->GetPageID());
+
+      new_leaf_page->SetNextPageID(GetNextPageID());
+      new_leaf_page->SetPrevPageID(single_page->GetPageID());
+      single_page->SetPrevPageID(GetPageID());
+      single_page->SetNextPageID(new_leaf_page->GetPageID());
+
+      SetNextPageID(single_page->GetPageID());
+
+      *ret_child_pos = child_idx + 1;
+      // auto child_pos = child_idx + 1;
+
+      // TODO: 这里需要整理下
+      if (parent != nullptr) {
+        SetParentPageID(parent->GetPageID());
+        new_leaf_page->SetParentPageID(parent->GetPageID());
+        assert(child_idx >= 0);
+        // NOTE: always new_leaf_page
+        parent->index_node_add_child(child_idx, prev_key, child_idx + 1, single_page->GetPageID());
+        parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, single_page->GetPageID());
+        return nullptr;
+      } else {
+        auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        SetParentPageID(new_index_page->GetPageID());
+        new_leaf_page->SetParentPageID(new_index_page->GetPageID());
+        return new_index_page;
+      }
+
+
+
     }
   }
-  // new index page
-  // new leaf node page
-  auto mid_key = it.key();
-  SPDLOG_INFO("mid key: {}, count: {}", mid_key, count);
-  it++;
-  auto new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
   assert(new_leaf_page->IsLeafNode());
-  // update entries and count
-  SetCurrentEntries(count);
-  SetAvailable(GetAvailable() + (end.data_ - it.data_));
-
-  // update pointers
-  SetNextPageID(new_leaf_page->GetPageID());
-  new_leaf_page->SetPrevPageID(GetPageID());
 
   if (parent != nullptr) {
     SetParentPageID(parent->GetPageID());
@@ -232,8 +405,6 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
 //  SPDLOG_INFO("end debug: --------------------------------");
 
   // just one entry in one page
-  page_id_t right = new_leaf_page->GetPageID();
-  page_id_t left = GetPageID();
   auto child_pos = child_idx + 1;
   // NOTE: this case is important
   if (n_entries == 1 && new_key < start.key()) {
@@ -327,11 +498,15 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
 
   leaf_init(next_page, cnt, new_page_id);
   // 复制内容
-  auto copied_sz = end.data_ - start.data_;
-  // NOTE: 应该从entry start开始复制
-  memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
+  if (cnt > 0) {
+    auto copied_sz = end.data_ - start.data_;
+    // NOTE: 应该从entry start开始复制
+    memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
+    next_page->SetAvailable(MaxAvaiable() - copied_sz);
+  } else {
+    next_page->SetAvailable(MaxAvaiable());
+  }
   next_page->SetIsDirty(true);
-  next_page->SetAvailable(options_.page_size - LEAF_HEADER_SIZE - copied_sz);
   next_page->SetNextPageID(INVALID_PAGE_ID);
   next_page->SetLeafNode(true);
   return next_page;
@@ -356,6 +531,28 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manage
   next_page->SetCurrentEntries(cnt);
   auto right_child = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(right));
   SPDLOG_INFO("after new index node page_id = {}, available = {}", right_child->GetPageID(), right_child->GetAvailable());
+  return next_page;
+}
+
+BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager *buffer_pool_manager,
+                                           const std::vector<int64_t> &keys,
+                                           const std::vector<page_id_t> &children) {
+  page_id_t new_page_id;
+  auto next_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
+  assert(new_page_id != INVALID_PAGE_ID);
+  init(next_page, GetDegree(), keys.size(), new_page_id, false);
+  auto key_start = next_page->KeyPosStart();
+  for (int i = 0; i < keys.size(); i++) {
+    key_start[i] = keys[i];
+  }
+  auto child_start = next_page->ChildPosStart();
+  for (int i = 0; i < children.size(); i++) {
+    child_start[i] = children[i];
+  }
+
+  next_page->SetIsDirty(true);
+  // 设置entries
+  next_page->SetCurrentEntries(keys.size());
   return next_page;
 }
 

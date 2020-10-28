@@ -31,6 +31,7 @@ namespace yedis {
       return av;
     }
     inline void SetAvailable(uint32_t available) {
+      assert(available <= options_.page_size);
       EncodeFixed32(GetData() + AVAILABLE_OFFSET, available);
     }
     // is leaf node
@@ -151,6 +152,7 @@ namespace yedis {
     };
     BTreeNodePage* NewLeafPage(BufferPoolManager*, int cnt, const EntryIterator& start, const EntryIterator& end);
     BTreeNodePage* NewIndexPage(BufferPoolManager*, int cnt, int64_t key, page_id_t left,  page_id_t right);
+    BTreeNodePage* NewIndexPage(BufferPoolManager*, const std::vector<int64_t>& keys, const std::vector<page_id_t>& children);
     // 迁移start到末尾的key和child到新的index page上
     BTreeNodePage* NewIndexPageFrom(BufferPoolManager*, BTreeNodePage* src, int start);
     size_t available() {
