@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <spdlog/spdlog.h>
+#include <list>
 
 #include "page.hpp"
 #include "yedis.hpp"
@@ -42,6 +43,8 @@ class BufferPoolManager {
     }
     return ret;
   }
+
+  void FlushPage(Page* page);
  private:
   size_t pool_size_;
   YedisInstance* yedis_instance_;
@@ -49,6 +52,9 @@ class BufferPoolManager {
   int current_index_ = 0;
   std::unordered_map<page_id_t, int> records_;
   void *raw_memory_;
+  std::list<Page*> free_list_;
+  std::list<Page*> using_list_;
+  std::unordered_map<page_id_t, std::list<Page*>::iterator> lru_records_;
 };
 }
 #endif //YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_

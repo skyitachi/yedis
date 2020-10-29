@@ -24,7 +24,7 @@ Status BTree::add(int64_t key, const Slice& value) {
     meta_->SetLevels(meta_->GetLevels() + 1);
     // 更新root page
     meta_->SetRootPageId(root_->GetPageID());
-    SPDLOG_INFO("update meta info successfully");
+    SPDLOG_INFO("update meta info successfully, new root_page_id: {}", root_->GetPageID());
   }
   return s;
 }

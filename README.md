@@ -10,7 +10,7 @@ yet another rocksdb based redis, let's call it `yedis`
 #### 说明
 - zset member strlen(key + value) < page_size / 2
 - 默认8位的score 大小
-
+- degree >= 4, just for index_split, if not index_split will be complicated
 #### TODO
 - [x] 处理分裂如何记住当前需要分裂节点的位子
 - [x] 是否要记住当前page的父节点

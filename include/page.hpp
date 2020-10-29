@@ -44,6 +44,18 @@ namespace yedis {
       return options_.page_size;
     }
 
+    inline void Pin() {
+      pinned_ = true;
+    }
+    inline void UnPin() {
+      pinned_ = false;
+    }
+
+    inline bool Pinned() {
+      return pinned_;
+    }
+    inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, options_.page_size);}
+
    protected:
     static constexpr size_t OFFSET_PAGE_START = 0;
 
@@ -51,9 +63,9 @@ namespace yedis {
 
     BTreeOptions options_;
    private:
-    inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, options_.page_size);}
     char *data_;
     bool is_dirty_ = false;
+    bool pinned_ = false;
   };
 }
 #endif //YEDIS_INCLUDE_PAGE_HPP_

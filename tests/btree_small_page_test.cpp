@@ -41,7 +41,7 @@ class BTreeSmallPageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    root->destroy();
+    // root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -178,6 +178,50 @@ TEST_F(BTreeSmallPageTest, DebugFixedCase5) {
   int64_t keys[] = {3, 2, 1};
   int lens[] = {53, 18, 70};
   int limit = 3;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
+TEST_F(BTreeSmallPageTest, DebugFixedCase6) {
+  int64_t keys[] = {2, 6, 3, 4};
+  int lens[] = {53, 41, 3, 30};
+  int limit = 4;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
+TEST_F(BTreeSmallPageTest, DebugFixedCase7) {
+  int64_t keys[] = {2, 6, 3, 4};
+  int lens[] = {53, 41, 3, 30};
+  int limit = 4;
   std::vector<std::string*> values;
 
   for (int i = 0; i < limit; i++) {
