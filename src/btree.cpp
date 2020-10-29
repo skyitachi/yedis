@@ -39,6 +39,7 @@ Status BTree::init() {
   meta_ = reinterpret_cast<BTreeMetaPage*>(yedis_instance_->buffer_pool_manager->NewPage(&meta_page_id));
 
   meta_->SetPageID(meta_page_id);
+  yedis_instance_->buffer_pool_manager->Pin(meta_page_id);
   auto levels = meta_->GetLevels();
   if (levels == 0) {
     // initial state

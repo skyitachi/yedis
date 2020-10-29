@@ -45,6 +45,10 @@ class BufferPoolManager {
   }
 
   void FlushPage(Page* page);
+  void Pin(page_id_t page_id);
+  void Pin(Page* page);
+  void UnPin(page_id_t page_id);
+  void UnPin(Page* page);
  private:
   size_t pool_size_;
   YedisInstance* yedis_instance_;
@@ -55,6 +59,7 @@ class BufferPoolManager {
   std::list<Page*> free_list_;
   std::list<Page*> using_list_;
   std::unordered_map<page_id_t, std::list<Page*>::iterator> lru_records_;
+  std::unordered_map<page_id_t, Page*> pinned_records_;
 };
 }
 #endif //YEDIS_INCLUDE_BUFFER_POOL_MANAGER_HPP_

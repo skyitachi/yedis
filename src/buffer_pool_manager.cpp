@@ -35,7 +35,7 @@ BufferPoolManager::~BufferPoolManager() {
 
 // lru fetch
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
-  Page *next_page;
+  Page *next_page = nullptr;
   // fetch from lru records first
   auto it = lru_records_.find(page_id);
   if (it != lru_records_.end()) {
@@ -81,6 +81,37 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   return next_page;
 }
 
+void BufferPoolManager::Pin(Page *page) {
+  assert(page != nullptr);
+  Pin(page->GetPageId());
+}
+
+// TODO: make sure pin and unpin logic
+void BufferPoolManager::Pin(page_id_t page_id) {
+  if (pinned_records_.find(page_id) != pinned_records_.end()) {
+    return;
+  }
+  auto it = lru_records_.find(page_id);
+  assert(it != lru_records_.end());
+  using_list_.erase(it->second);
+  lru_records_.erase(it->first);
+  pinned_records_.insert(std::make_pair(it->first, *it->second));
+}
+
+void BufferPoolManager::UnPin(Page *page) {
+  assert(page != nullptr);
+  UnPin(page->GetPageId());
+}
+
+void BufferPoolManager::UnPin(page_id_t page_id) {
+  auto it = pinned_records_.find(page_id);
+  if (it == pinned_records_.end()) {
+    return;
+  }
+  using_list_.push_front(it->second);
+  lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
+}
+
 // lru
 Page* BufferPoolManager::NewPage(page_id_t *page_id) {
   *page_id = yedis_instance_->disk_manager->AllocatePage();
@@ -92,11 +123,15 @@ Status BufferPoolManager::Flush() {
   for (auto &it: using_list_) {
     FlushPage(it);
   }
+  for (auto &[page_id, page]: pinned_records_) {
+    FlushPage(page);
+  }
   return Status::OK();
 }
 
 void BufferPoolManager::FlushPage(Page *page) {
   if (page->IsDirty()) {
+    SPDLOG_INFO("flush_page page_id {}", page->GetPageId());
     yedis_instance_->disk_manager->WritePage(page->GetPageId(), page->GetData());
     page->ResetMemory();
   }
