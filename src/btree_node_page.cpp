@@ -479,7 +479,8 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manage
   page_id_t new_page_id;
   auto next_page = static_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
   assert(new_page_id != INVALID_PAGE_ID);
-  init(next_page, GetDegree(), cnt, new_page_id, false);
+  // TODO: make sure
+  init(next_page, MAX_DEGREE, cnt, new_page_id, false);
   // 复制内容
   auto key_start = next_page->KeyPosStart();
   key_start[0] = key;
@@ -496,13 +497,14 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manage
   return next_page;
 }
 
+// 一定要make static，因为当前页可能被换出到内存了
 BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager *buffer_pool_manager,
                                            const std::vector<int64_t> &keys,
                                            const std::vector<page_id_t> &children) {
   page_id_t new_page_id;
   auto next_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
   assert(new_page_id != INVALID_PAGE_ID);
-  init(next_page, GetDegree(), keys.size(), new_page_id, false);
+  init(next_page, MAX_DEGREE, keys.size(), new_page_id, false);
   auto key_start = next_page->KeyPosStart();
   for (int i = 0; i < keys.size(); i++) {
     key_start[i] = keys[i];

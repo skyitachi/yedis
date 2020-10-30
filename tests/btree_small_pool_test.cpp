@@ -19,7 +19,8 @@ class BTreeSmallPoolTest : public testing::Test {
     disk_manager_ = new DiskManager("btree_node_page_test.idx", options);
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;
-    buffer_pool_manager_ = new BufferPoolManager(3, yedis_instance_, options);
+    // 太小的buffer pool也不够
+    buffer_pool_manager_ = new BufferPoolManager(5, yedis_instance_, options);
     yedis_instance_->buffer_pool_manager = buffer_pool_manager_;
     root = new BTree(yedis_instance_);
   }
@@ -52,8 +53,6 @@ class BTreeSmallPoolTest : public testing::Test {
   DiskManager *disk_manager_;
   YedisInstance *yedis_instance_;
 };
-
-
 
 TEST_F(BTreeSmallPoolTest, DebugFixedCase1) {
   int64_t keys[] = {3, 5, 1, 4, 2};
