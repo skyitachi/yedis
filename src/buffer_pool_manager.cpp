@@ -134,6 +134,8 @@ void BufferPoolManager::FlushPage(Page *page) {
     SPDLOG_INFO("flush_page page_id {}", page->GetPageId());
     yedis_instance_->disk_manager->WritePage(page->GetPageId(), page->GetData());
     page->ResetMemory();
+  } else {
+    SPDLOG_INFO("no need to flush: {}", page->GetPageId());
   }
 }
 }
