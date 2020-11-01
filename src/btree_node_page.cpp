@@ -29,14 +29,17 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
   return Status::NotSupported();
 }
 
+// NOTE: only root node can add key
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
+  assert(target_leaf_page->Pinned());
   assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvaiable());
 
   SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
+  buffer_pool_manager->UnPin(target_leaf_page);
   return s;
 }
 
@@ -89,6 +92,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       if (*root == this) {
         // 当前index node就是根节点
         auto new_root = it->index_split(buffer_pool_manager, nullptr, 0);
+        buffer_pool_manager->Pin(new_root);
         *root = new_root;
       } else {
         assert(parent != nullptr && pos != -1);
@@ -102,6 +106,9 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     auto key_end = key_start + n_keys;
     SPDLOG_INFO("[{}] page_id: {}, key: {}, n_keys: {}, degree: {}", key, it->GetPageID(), key, n_keys, it->GetDegree());
     auto result = std::lower_bound(key_start, key_end, key);
+    if (parent != nullptr && parent != *root) {
+      buffer_pool_manager->UnPin(parent);
+    }
     parent = it;
     if (result != key_end) {
       // found
@@ -115,6 +122,8 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       assert(child_start[pos] != 0);
       it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
     }
+    // NOTE: make sure parent and leaf node is pinned
+    buffer_pool_manager->Pin(it);
   }
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
@@ -122,17 +131,18 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     // TODO: 当一页只有一个数据的时候，且要插入的key小于该key的时候会有问题, 分裂的时候要把新key加入父结点的childs上
     int child_pos = pos + 1;
     SPDLOG_INFO("before leaf_split child_pos = {}", child_pos);
-    if (parent != nullptr) {
-      buffer_pool_manager->Pin(parent);
-    }
     auto new_root = it->leaf_split(buffer_pool_manager, key, total_len, parent, pos, &child_pos);
     SPDLOG_INFO("after leaf_split child_pos = {}", child_pos);
     // debug_available(buffer_pool_manager);
+    // *root will never be nullptr
+    // TODO: the following line is unnecessary
     if (*root != nullptr) {
       //　update root
       SPDLOG_INFO("root not null root page_id: {}", (*root)->GetPageID());
       if (new_root != nullptr) {
         buffer_pool_manager->Pin(new_root);
+        // NOTE: only one leaf node meet with split will cause it unpinned
+        buffer_pool_manager->UnPin(*root);
         SPDLOG_INFO("search found new root: {}", new_root->GetPageID());
         *root = new_root;
       } else {
@@ -140,9 +150,14 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       }
     }
     if (parent == nullptr) {
+      // NOTE: root or new_root always be pinned, so parent is pinned
       parent = *root;
+    } else {
+      // NOTE: UnPin it as soon as possible
+      buffer_pool_manager->UnPin(it);
     }
     assert(parent != nullptr);
+    assert(parent->Pinned());
     // debug_available(buffer_pool_manager);
     SPDLOG_INFO("root page_id={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
     SPDLOG_INFO("root page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
@@ -151,6 +166,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     if (key <= parent->GetKey(pos)) {
       auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
       SPDLOG_INFO("target leaf node page_id: {}, available={}", parent->GetChild(pos), child_page->GetAvailable());
+      buffer_pool_manager->Pin(child_page);
       return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
     }
 //    debug_available(buffer_pool_manager);
@@ -158,11 +174,13 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     // NOTE: child pos 不一定是pos + 1
     auto child_page_id = parent->GetChild(child_pos);
     auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
+    buffer_pool_manager->Pin(child_page);
     assert(child_page->IsLeafNode());
     SPDLOG_INFO("[{}] target leaf node page_id: {}, available={}", key, child_page_id, child_page->GetAvailable());
     return child_page;
   }
   // leaf node没有满直接返回
+  // it was pinned in the last loop
   return it;
 }
 
@@ -190,10 +208,13 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
 }
 
 // 返回new root, 设置child pos的位置
-// TODO: 这里的分裂算法有点问题, 以mid-key分裂不能保证新节点有足够空间容纳下一个元素的空间
 // 新key有可能插入老节点，这里还要判断老节点分裂之后能否容下新key
+// NOTE: assume current leaf_split page is pinned
 BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager, int64_t new_key, uint32_t total_size, BTreeNodePage* parent, int child_idx, int *ret_child_pos) {
-  buffer_pool_manager->Pin(this);
+  assert(Pinned());
+  if (parent != nullptr) {
+    assert(parent->Pinned());
+  }
   assert(IsLeafNode());
   int n_entries = GetCurrentEntries();
   SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
@@ -226,6 +247,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
     // new_key is smallest
     mid_key = new_key;
     new_leaf_page = NewLeafPage(buffer_pool_manager, 0, it, it);
+    // 手动pin?
     buffer_pool_manager->Pin(new_leaf_page);
     left = new_leaf_page->GetPageID();
     child_keys.push_back(mid_key);
@@ -247,18 +269,17 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       // NOTE: always new_leaf_page
       parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
-      buffer_pool_manager->UnPin(this);
       return nullptr;
     } else {
       // 不支持并发
       auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+      buffer_pool_manager->Pin(new_index_page);
 //    SPDLOG_INFO("after new index page: --------------------------------");
 //    debug_available(buffer_pool_manager);
 //    SPDLOG_INFO("end debug: --------------------------------");
       SetParentPageID(new_index_page->GetPageID());
       new_leaf_page->SetParentPageID(new_index_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
-      buffer_pool_manager->UnPin(this);
       return new_index_page;
     }
   } else if (sz == used) {
@@ -286,14 +307,15 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       // NOTE: always new_leaf_page
       parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
-      buffer_pool_manager->UnPin(this);
       return nullptr;
     } else {
       auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+      // NOTE: make sure new_index_page will pinned, if new_index_page is not null, it will be return as root
+      // pin here will be more accurate
+      buffer_pool_manager->Pin(new_index_page);
       SetParentPageID(new_index_page->GetPageID());
       new_leaf_page->SetParentPageID(new_index_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
-      buffer_pool_manager->UnPin(this);
       return new_index_page;
     }
   } else {
@@ -326,14 +348,13 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         // NOTE: always new_leaf_page
         parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
         buffer_pool_manager->UnPin(new_leaf_page);
-        buffer_pool_manager->UnPin(this);
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        buffer_pool_manager->Pin(new_index_page);
         SetParentPageID(new_index_page->GetPageID());
         new_leaf_page->SetParentPageID(new_index_page->GetPageID());
         buffer_pool_manager->UnPin(new_leaf_page);
-        buffer_pool_manager->UnPin(this);
         return new_index_page;
       }
 
@@ -371,10 +392,10 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        buffer_pool_manager->Pin(new_index_page);
         SetParentPageID(new_index_page->GetPageID());
         new_leaf_page->SetParentPageID(new_index_page->GetPageID());
         buffer_pool_manager->UnPin(new_leaf_page);
-        buffer_pool_manager->UnPin(this);
         return new_index_page;
       }
     } else {
@@ -413,16 +434,15 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, new_leaf_page->GetPageID());
         buffer_pool_manager->UnPin(single_page);
         buffer_pool_manager->UnPin(new_leaf_page);
-        buffer_pool_manager->UnPin(this);
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
+        buffer_pool_manager->Pin(new_index_page);
         SetParentPageID(new_index_page->GetPageID());
         new_leaf_page->SetParentPageID(new_index_page->GetPageID());
         single_page->SetParentPageID(new_index_page->GetPageID());
         buffer_pool_manager->UnPin(single_page);
         buffer_pool_manager->UnPin(new_leaf_page);
-        buffer_pool_manager->UnPin(this);
         return new_index_page;
       }
     }

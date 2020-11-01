@@ -39,6 +39,7 @@ Status BTree::init() {
   meta_ = reinterpret_cast<BTreeMetaPage*>(yedis_instance_->buffer_pool_manager->NewPage(&meta_page_id));
 
   meta_->SetPageID(meta_page_id);
+  SPDLOG_INFO("meta_page page_id {}", meta_->GetPageID());
   yedis_instance_->buffer_pool_manager->Pin(meta_page_id);
   auto levels = meta_->GetLevels();
   if (levels == 0) {
@@ -46,9 +47,11 @@ Status BTree::init() {
     spdlog::info("init btree with empty state");
     page_id_t root_page_id;
     root_ = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&root_page_id));
-    spdlog::debug("init empty btree root_page_id: {}", root_page_id);
     root_->SetPageID(root_page_id);
-    spdlog::debug("GetPageID from BTreeNodeMethod: {}", root_->GetPageID());
+    SPDLOG_INFO("init empty btree root_page_id: {}", root_page_id);
+    SPDLOG_INFO("GetPageID from BTreeNodeMethod: {}", root_->GetPageID());
+    // Note: Pin Root
+    yedis_instance_->buffer_pool_manager->Pin(root_);
     meta_->SetRootPageId(root_page_id);
     meta_->SetLevels(1);
     spdlog::debug("meta_ level: {}", meta_->GetLevels());

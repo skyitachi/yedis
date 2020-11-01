@@ -29,10 +29,10 @@ namespace yedis {
 
     void SetIsDirty(bool is_dirty) {
       is_dirty_ = is_dirty;
-    }
 
-    auto GetPageId() const {
-      return page_id_;
+    }
+    inline page_id_t GetPageId() {
+      return *reinterpret_cast<page_id_t*>(GetData());
     }
 
     void SetPageID(page_id_t page_id) {
@@ -45,13 +45,16 @@ namespace yedis {
     }
 
     inline void Pin() {
+      SPDLOG_INFO("page_id {} pinned", GetPageId());
       pinned_ = true;
     }
+
     inline void UnPin() {
+      SPDLOG_INFO("page_id {} unpinned", GetPageId());
       pinned_ = false;
     }
 
-    inline bool Pinned() {
+    inline bool Pinned() const {
       return pinned_;
     }
     inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, options_.page_size);}

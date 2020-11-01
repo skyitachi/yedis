@@ -34,9 +34,16 @@ BufferPoolManager::~BufferPoolManager() {
 }
 
 // lru fetch
+// TODO: pinned fetch
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   Page *next_page = nullptr;
-  // fetch from lru records first
+  // fetch from pinned records first
+  auto pinned_it = pinned_records_.find(page_id);
+  if (pinned_it != pinned_records_.end()) {
+    SPDLOG_INFO("found page_id {} in pinned records", page_id);
+    return pinned_it->second;
+  }
+  // fetch from lru records second
   auto it = lru_records_.find(page_id);
   if (it != lru_records_.end()) {
     // 放到队首
@@ -57,10 +64,10 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
     lru_records_.insert(std::make_pair(page_id, first));
     yedis_instance_->disk_manager->ReadPage(page_id, next_page->GetData());
     next_page->SetPageID(page_id);
-    SPDLOG_INFO("using_list_ first: page_id {}", (*first)->GetPageId());
+    SPDLOG_INFO("current using_list_ first: page_id {}", next_page->GetPageId());
   } else if (!using_list_.empty()) {
-    auto it = lru_records_.find(page_id);
-    if (it == lru_records_.end()) {
+    auto iterator = lru_records_.find(page_id);
+    if (iterator == lru_records_.end()) {
       // 需要淘汰
       auto least_used_page = using_list_.back();
       using_list_.pop_back();
@@ -89,13 +96,17 @@ void BufferPoolManager::Pin(Page *page) {
 // TODO: make sure pin and unpin logic
 void BufferPoolManager::Pin(page_id_t page_id) {
   if (pinned_records_.find(page_id) != pinned_records_.end()) {
+    SPDLOG_INFO("found {} in pinned records", page_id);
     return;
   }
   auto it = lru_records_.find(page_id);
   assert(it != lru_records_.end());
+  SPDLOG_INFO("found page {} in lru_records", page_id);
+  (*(it->second))->Pin();
+  pinned_records_.insert(std::make_pair(it->first, *(it->second)));
+  // TODO: 这里会影响到相关内存的有效问题
   using_list_.erase(it->second);
   lru_records_.erase(it->first);
-  pinned_records_.insert(std::make_pair(it->first, *it->second));
 }
 
 void BufferPoolManager::UnPin(Page *page) {
@@ -109,6 +120,7 @@ void BufferPoolManager::UnPin(page_id_t page_id) {
     return;
   }
   using_list_.push_front(it->second);
+  it->second->UnPin();
   lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
 }
 
@@ -116,7 +128,9 @@ void BufferPoolManager::UnPin(page_id_t page_id) {
 Page* BufferPoolManager::NewPage(page_id_t *page_id) {
   *page_id = yedis_instance_->disk_manager->AllocatePage();
   SPDLOG_INFO("NewPage page_id: {}", *page_id);
-  return FetchPage(*page_id);
+  auto new_page = FetchPage(*page_id);
+  new_page->SetPageID(*page_id);
+  return new_page;
 }
 
 Status BufferPoolManager::Flush() {

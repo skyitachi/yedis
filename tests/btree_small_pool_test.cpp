@@ -19,7 +19,8 @@ class BTreeSmallPoolTest : public testing::Test {
     disk_manager_ = new DiskManager("btree_node_page_test.idx", options);
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;
-    // 太小的buffer pool也不够
+    // 太小的buffer pool也不够, 当前最小的buffer pool size是6个
+    // meta page, root, parent, current, new_leaf_node for the split page, new leaf node for the key
     buffer_pool_manager_ = new BufferPoolManager(5, yedis_instance_, options);
     yedis_instance_->buffer_pool_manager = buffer_pool_manager_;
     root = new BTree(yedis_instance_);
