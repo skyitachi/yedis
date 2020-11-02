@@ -39,7 +39,10 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
 
   SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
-  buffer_pool_manager->UnPin(target_leaf_page);
+  if (target_leaf_page != *root) {
+    // 非root 节点可以UnPin
+    buffer_pool_manager->UnPin(target_leaf_page);
+  }
   return s;
 }
 
@@ -51,6 +54,7 @@ Status BTreeNodePage::read(int64_t key, std::string *result) {
   return Status::NotSupported();
 }
 
+// TODO: Pin Or UnPin
 Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, std::string *result) {
   auto it = this;
   std::vector<page_id_t> path;

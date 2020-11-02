@@ -249,7 +249,9 @@ TEST_F(BTreeSmallPageTest, RandomInsert) {
     test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, s);
     presets_.insert(std::pair(key, s));
   }
+  int count = 0;
   for (const auto it: presets_) {
+    SPDLOG_INFO("inserted key {}, v_len= {}, count = {}", it.first, it.second->size(), count++);
     auto s = root->add(it.first, *it.second);
     ASSERT_TRUE(s.ok());
   }

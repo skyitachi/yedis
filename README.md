@@ -31,3 +31,5 @@ yet another rocksdb based redis, let's call it `yedis`
 
 #### bugs
 1. [ ] current page_id will be wrong after page return back to memory, if not call SetPageID implicitly
+2. [ ] map erase will cause pointer destruct?
+    - 并不会导致指针的析构 

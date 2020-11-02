@@ -42,7 +42,7 @@ class BTreeSmallPoolTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-     root->destroy();
+    root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;

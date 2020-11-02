@@ -7,7 +7,7 @@
 namespace yedis {
 
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance) {
-  assert(pool_size != 0);
+  assert(pool_size >= MinPoolSize);
   pool_size_ = pool_size;
   for (int i = 0; i < pool_size; i++) {
     free_list_.push_back(new Page());
@@ -16,7 +16,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_inst
 }
 
 BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_instance, BTreeOptions options) {
-  assert(pool_size != 0);
+  assert(pool_size >= MinPoolSize);
   pool_size_ = pool_size;
   for (int i = 0; i < pool_size_; i++) {
     free_list_.push_back(new Page(options));
@@ -25,6 +25,9 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, YedisInstance* yedis_inst
 }
 
 BufferPoolManager::~BufferPoolManager() {
+  for (auto &it: pinned_records_) {
+    delete it.second;
+  }
   for (auto &it: using_list_) {
     delete it;
   }
@@ -105,8 +108,11 @@ void BufferPoolManager::Pin(page_id_t page_id) {
   (*(it->second))->Pin();
   pinned_records_.insert(std::make_pair(it->first, *(it->second)));
   // TODO: 这里会影响到相关内存的有效问题
+  SPDLOG_INFO("before using list delete iterator: page_id {}, it.key {}", page_id, it->first);
   using_list_.erase(it->second);
+  SPDLOG_INFO("using_list_ erase done, before lru_records delete iterator, page_id {}", page_id);
   lru_records_.erase(it->first);
+  SPDLOG_INFO("lru_records erase done: {}", it->first);
 }
 
 void BufferPoolManager::UnPin(Page *page) {
@@ -122,6 +128,7 @@ void BufferPoolManager::UnPin(page_id_t page_id) {
   using_list_.push_front(it->second);
   it->second->UnPin();
   lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
+  pinned_records_.erase(page_id);
 }
 
 // lru
