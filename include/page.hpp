@@ -20,6 +20,7 @@ namespace yedis {
     }
     Page(): Page(BTreeOptions{}) {}
     ~Page() {
+      SPDLOG_INFO("page destructor {}", GetPageId());
       delete data_;
     };
 

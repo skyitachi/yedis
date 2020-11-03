@@ -108,7 +108,8 @@ void BufferPoolManager::Pin(page_id_t page_id) {
   (*(it->second))->Pin();
   pinned_records_.insert(std::make_pair(it->first, *(it->second)));
   // TODO: 这里会影响到相关内存的有效问题
-  SPDLOG_INFO("before using list delete iterator: page_id {}, it.key {}", page_id, it->first);
+  SPDLOG_INFO("before using list delete iterator: page_id {}, it.key {}", (*it->second)->GetPageId(), it->first);
+  // TODO: 这里要确保只会被删除一次
   using_list_.erase(it->second);
   SPDLOG_INFO("using_list_ erase done, before lru_records delete iterator, page_id {}", page_id);
   lru_records_.erase(it->first);
