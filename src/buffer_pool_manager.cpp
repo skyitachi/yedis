@@ -57,6 +57,10 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
     }
     using_list_.erase(it->second);
     using_list_.push_front(next_page);
+    // important: 更新iterator
+    // 需要先删除
+    lru_records_.erase(page_id);
+    lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
     return next_page;
   }
   if (!free_list_.empty()) {
@@ -126,10 +130,11 @@ void BufferPoolManager::UnPin(page_id_t page_id) {
   if (it == pinned_records_.end()) {
     return;
   }
-  using_list_.push_front(it->second);
   it->second->UnPin();
-  lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
   pinned_records_.erase(page_id);
+  // NOTE: 放到了队首 值得商榷
+  using_list_.push_front(it->second);
+  lru_records_.insert(std::make_pair(page_id, using_list_.begin()));
 }
 
 // lru
@@ -155,10 +160,10 @@ void BufferPoolManager::FlushPage(Page *page) {
   if (page->IsDirty()) {
     SPDLOG_INFO("flush_page page_id {}", page->GetPageId());
     yedis_instance_->disk_manager->WritePage(page->GetPageId(), page->GetData());
-    page->ResetMemory();
   } else {
     SPDLOG_INFO("no need to flush: {}", page->GetPageId());
   }
+  page->ResetMemory();
 }
 }
 
