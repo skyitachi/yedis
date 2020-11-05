@@ -21,7 +21,7 @@ class BTreeSmallPoolTest : public testing::Test {
     yedis_instance_->disk_manager = disk_manager_;
     // 太小的buffer pool也不够, 当前最小的buffer pool size是6个
     // meta page, root, parent, current, new_leaf_node for the split page, new leaf node for the key
-    buffer_pool_manager_ = new BufferPoolManager(5, yedis_instance_, options);
+    buffer_pool_manager_ = new BufferPoolManager(6, yedis_instance_, options);
     yedis_instance_->buffer_pool_manager = buffer_pool_manager_;
     root = new BTree(yedis_instance_);
   }
@@ -42,7 +42,7 @@ class BTreeSmallPoolTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    root->destroy();
+//    root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -207,6 +207,28 @@ TEST_F(BTreeSmallPoolTest, DebugFixedCase7) {
     auto s = root->read(keys[i], &tmp);
     ASSERT_TRUE(s.ok());
     ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
+TEST_F(BTreeSmallPoolTest, RandomInsert) {
+  std::unordered_map<int64_t, std::string*> presets_;
+  int limit = 15;
+  for (int i = 0; i <= limit; i++) {
+    auto key = rnd->NextInt64();
+    std::string* s = new std::string();
+    test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, s);
+    presets_.insert(std::pair(key, s));
+  }
+  int count = 0;
+  for (const auto it: presets_) {
+    SPDLOG_INFO("inserted key {}, v_len= {}, count = {}", it.first, it.second->size(), count++);
+    auto s = root->add(it.first, *it.second);
+    ASSERT_TRUE(s.ok());
+  }
+  for (const auto it: presets_) {
+    std::string tmp;
+    auto s = root->read(it.first, &tmp);
+    ASSERT_EQ(tmp, *it.second);
   }
 }
 }

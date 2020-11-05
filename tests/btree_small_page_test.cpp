@@ -242,7 +242,7 @@ TEST_F(BTreeSmallPageTest, DebugFixedCase7) {
 
 TEST_F(BTreeSmallPageTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
-  int limit = 30;
+  int limit = 15;
   for (int i = 0; i <= limit; i++) {
     auto key = rnd->NextInt64();
     std::string* s = new std::string();

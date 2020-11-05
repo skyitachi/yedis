@@ -116,8 +116,9 @@ void BufferPoolManager::Pin(page_id_t page_id) {
   // TODO: 这里要确保只会被删除一次
   using_list_.erase(it->second);
   SPDLOG_INFO("using_list_ erase done, before lru_records delete iterator, page_id {}", page_id);
-  lru_records_.erase(it->first);
-  SPDLOG_INFO("lru_records erase done: {}", it->first);
+  lru_records_.erase(page_id);
+  // NOTE: after erase iterator was not defined
+  SPDLOG_INFO("lru_records erase done: {}", page_id);
 }
 
 void BufferPoolManager::UnPin(Page *page) {
