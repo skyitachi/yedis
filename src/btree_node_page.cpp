@@ -107,12 +107,19 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     int64_t* key_start = it->KeyPosStart();
     int n_keys = it->GetCurrentEntries();
     auto child_start = it->ChildPosStart();
-    auto key_end = key_start + n_keys;
+    // 这里算的真有问题吗
+    int64_t* key_end = key_start + n_keys;
     SPDLOG_INFO("[{}] page_id: {}, key: {}, n_keys: {}, degree: {}", key, it->GetPageID(), key, n_keys, it->GetDegree());
-    auto result = std::lower_bound(key_start, key_end, key);
+    printf("---------------------------------\n");
+    for (int i = 0; i < n_keys; i++) {
+      printf("%lld ", key_start[i]);
+    }
+    printf("\n---------------------------------\n");
+    int64_t* result = std::lower_bound(key_start, key_end, key);
     if (parent != nullptr && parent != *root) {
       buffer_pool_manager->UnPin(parent);
     }
+    printf("result = %p, key_start = %p\n", result, key_start);
     parent = it;
     if (result != key_end) {
       // found
@@ -198,6 +205,7 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
   auto mid_key  = key_start[n_entries / 2];
   // 需要将right部分的数据迁移到新的index node上
   auto new_index_page = NewIndexPageFrom(buffer_pool_manager, this, n_entries / 2 + 1);
+  SPDLOG_INFO("split mid_key = {}", mid_key);
 
   SetCurrentEntries(n_entries / 2 - 1);
   if (parent == nullptr) {
@@ -249,6 +257,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   }
   if (sz == 0) {
     // new_key is smallest
+    SPDLOG_INFO("[page_id {}] to insert smallest key", GetPageID());
     mid_key = new_key;
     new_leaf_page = NewLeafPage(buffer_pool_manager, 0, it, it);
     // 手动pin?
@@ -512,6 +521,7 @@ Status BTreeNodePage::leaf_search(int64_t target, std::string *dst) {
 // TODO: should be static method
 BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager, int cnt, const EntryIterator &start, const EntryIterator &end) {
   assert(cnt >= 0);
+  SPDLOG_INFO("[page_id {}] leaf page with count {}", GetPageID(), cnt);
   page_id_t new_page_id;
   auto next_page = static_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
   assert(new_page_id != INVALID_PAGE_ID);

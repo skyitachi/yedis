@@ -16,7 +16,7 @@ class BTreeSmallPoolTest : public testing::Test {
  protected:
   void SetUp() override {
     options.page_size = 128;
-    disk_manager_ = new DiskManager("btree_node_page_test.idx", options);
+    disk_manager_ = new DiskManager("btree_small_pool_debug.idx", options);
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;
     // 太小的buffer pool也不够, 当前最小的buffer pool size是6个
@@ -210,6 +210,50 @@ TEST_F(BTreeSmallPoolTest, DebugFixedCase7) {
   }
 }
 
+TEST_F(BTreeSmallPoolTest, DebugFixedCase8) {
+  int64_t keys[] = {1, 8, 6, 2, 4, 11, 10, 18, 7, 9};
+  int lens[] = {39, 64, 35, 37, 60, 12, 70, 90, 40, 60};
+  int limit = 10;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
+TEST_F(BTreeSmallPoolTest, DebugFixedCase9) {
+  int64_t keys[] = {1, 8, 6, 2, 4, 11, 10, 18, 7, 9};
+  int lens[] = {39, 64, 35, 37, 60, 12, 70, 90, 40, 60};
+  int limit = 7;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
 TEST_F(BTreeSmallPoolTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 15;
@@ -224,10 +268,8 @@ TEST_F(BTreeSmallPoolTest, RandomInsert) {
     SPDLOG_INFO("inserted key {}, v_len= {}, count = {}", it.first, it.second->size(), count++);
     auto s = root->add(it.first, *it.second);
     ASSERT_TRUE(s.ok());
-  }
-  for (const auto it: presets_) {
     std::string tmp;
-    auto s = root->read(it.first, &tmp);
+    s = root->read(it.first, &tmp);
     ASSERT_EQ(tmp, *it.second);
   }
 }
