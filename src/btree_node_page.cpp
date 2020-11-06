@@ -98,9 +98,13 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         auto new_root = it->index_split(buffer_pool_manager, nullptr, 0);
         buffer_pool_manager->Pin(new_root);
         *root = new_root;
+        // look from new root
+        it = new_root;
       } else {
         assert(parent != nullptr && pos != -1);
         it->index_split(buffer_pool_manager, parent, pos);
+        // NOTE: need test
+        it = parent;
       }
     }
     // TODO: ignore duplicate key
@@ -202,12 +206,14 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
   int n_entries = GetCurrentEntries();
   SPDLOG_INFO("page_id {}, n_entries = {}", GetPageID(), n_entries);
   assert(n_entries >= 4);
+  assert(!IsLeafNode());
+  // NOTE: make mid_key to parent level
   auto mid_key  = key_start[n_entries / 2];
   // 需要将right部分的数据迁移到新的index node上
   auto new_index_page = NewIndexPageFrom(buffer_pool_manager, this, n_entries / 2 + 1);
   SPDLOG_INFO("split mid_key = {}", mid_key);
-
-  SetCurrentEntries(n_entries / 2 - 1);
+  // no need to rewrite key_start[n_entries / 2]
+  SetCurrentEntries(n_entries / 2);
   if (parent == nullptr) {
     auto new_root = NewIndexPage(buffer_pool_manager, 1, mid_key, GetPageID(), new_index_page->GetPageID());
     SetParentPageID(new_root->GetPageID());
@@ -592,15 +598,27 @@ BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BufferPoolManager* buffer_pool_ma
   page_id_t page_id;
   auto new_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&page_id));
   auto cnt = src->GetCurrentEntries() - start;
+  SPDLOG_INFO("new index page_id {}, with {} keys, start: {}", page_id, cnt, start);
   new_page->SetCurrentEntries(cnt);
   new_page->SetPageID(page_id);
   // index_node需要设置degree
   new_page->SetDegree(src->GetDegree());
-  // 复制key
-  memcpy(new_page->KeyPosStart(), src->KeyPosStart() + start, cnt);
-  // 复制child
-  memcpy(new_page->ChildPosStart(), src->KeyPosStart() + start - 1, cnt + 1);
+  // 复制key [start, n_entries)
+  memmove(new_page->KeyPosStart(), src->KeyPosStart() + start, cnt * sizeof(int64_t));
+  printf("origin children-------------------------------\n");
+  for (int i = start; i < src->GetCurrentEntries(); i++) {
+    printf("%lld ", src->GetKey(i));
+  }
+  printf("\n----------------------\n");
+  printf("new children--------------------------\n");
+  for (int i = 0; i < cnt; i++) {
+    printf("%lld ", new_page->GetKey(i));
+  }
+  printf("\n----------------------\n");
+  // 复制child, [start, n_entries]
+  memmove(new_page->ChildPosStart(), src->ChildPosStart() + start, (cnt + 1) * sizeof(int64_t));
   new_page->SetIsDirty(true);
+  new_page->SetLeafNode(false);
   return new_page;
 }
 

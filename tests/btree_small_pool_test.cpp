@@ -213,7 +213,7 @@ TEST_F(BTreeSmallPoolTest, DebugFixedCase7) {
 TEST_F(BTreeSmallPoolTest, DebugFixedCase8) {
   int64_t keys[] = {1, 8, 6, 2, 4, 11, 10, 18, 7, 9};
   int lens[] = {39, 64, 35, 37, 60, 12, 70, 90, 40, 60};
-  int limit = 10;
+  int limit = 6;
   std::vector<std::string*> values;
 
   for (int i = 0; i < limit; i++) {
@@ -246,23 +246,22 @@ TEST_F(BTreeSmallPoolTest, DebugFixedCase9) {
     auto s = root->add(keys[i], *v);
     ASSERT_TRUE(s.ok());
   }
-  for (int i = 0; i < limit; i++) {
-    std::string tmp;
-    auto s = root->read(keys[i], &tmp);
-    ASSERT_TRUE(s.ok());
-    ASSERT_EQ(tmp, *values[i]);
-  }
+//  for (int i = 0; i < limit; i++) {
+//    std::string tmp;
+//    auto s = root->read(keys[i], &tmp);
+//    ASSERT_TRUE(s.ok());
+//    ASSERT_EQ(tmp, *values[i]);
+//  }
 }
 
 TEST_F(BTreeSmallPoolTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
-  int limit = 15;
+  int limit = 30;
   for (int i = 0; i <= limit; i++) {
     auto key = rnd->NextInt64();
     std::string* s = new std::string();
     test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, s);
-    presets_.insert(std::pair(key, s));
-  }
+    presets_.insert(std::pair(key, s));}
   int count = 0;
   for (const auto it: presets_) {
     SPDLOG_INFO("inserted key {}, v_len= {}, count = {}", it.first, it.second->size(), count++);

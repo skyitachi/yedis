@@ -30,8 +30,8 @@ yet another rocksdb based redis, let's call it `yedis`
 - [ ] small page_size test
 
 #### bugs
-1. [ ] current page_id will be wrong after page return back to memory, if not call SetPageID implicitly
+1. [x] current page_id will be wrong after page return back to memory, if not call SetPageID implicitly
 2. [x] map erase will cause pointer destruct?
     - 并不会导致指针的析构 
-3. index要满的情况，leaf_split可能会导致，index要add 2次child，所以有可能导致index也会满掉的场景
+3. [ ] index要满的情况，leaf_split可能会导致，index要add 2次child，所以有可能导致index也会满掉的场景
     
