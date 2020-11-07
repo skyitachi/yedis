@@ -89,7 +89,7 @@ Page* BufferPoolManager::FetchPage(page_id_t page_id) {
       next_page->SetPageID(page_id);
     }
   } else {
-    SPDLOG_ERROR("no enough page");
+    SPDLOG_ERROR("no enough page, pinned_records size {}", pinned_records_.size());
     return nullptr;
   }
   return next_page;

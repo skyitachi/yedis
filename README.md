@@ -34,4 +34,5 @@ yet another rocksdb based redis, let's call it `yedis`
 2. [x] map erase will cause pointer destruct?
     - 并不会导致指针的析构 
 3. [ ] index要满的情况，leaf_split可能会导致，index要add 2次child，所以有可能导致index也会满掉的场景
+4. [ ] pin and unpin logic
     

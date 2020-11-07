@@ -71,7 +71,7 @@ Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, 
   }
   assert(it->IsLeafNode());
   path.push_back(it->GetPageID());
-  printf("[%ld] read search path: ---------------------\n", key);
+  printf("[%lld] read search path: ---------------------\n", key);
   for(auto p: path) {
     printf(" %d", p);
   }
@@ -103,7 +103,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       } else {
         assert(parent != nullptr && pos != -1);
         it->index_split(buffer_pool_manager, parent, pos);
-        // NOTE: need test
+        // TODO: need test
         it = parent;
       }
     }
@@ -120,7 +120,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     }
     printf("\n---------------------------------\n");
     int64_t* result = std::lower_bound(key_start, key_end, key);
-    if (parent != nullptr && parent != *root) {
+    if (parent != nullptr && parent != *root && parent != it) {
       buffer_pool_manager->UnPin(parent);
     }
     printf("result = %p, key_start = %p\n", result, key_start);
