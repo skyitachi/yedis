@@ -143,7 +143,6 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
     // debug_available(buffer_pool_manager);
-    // TODO: 当一页只有一个数据的时候，且要插入的key小于该key的时候会有问题, 分裂的时候要把新key加入父结点的childs上
     int child_pos = pos + 1;
     SPDLOG_INFO("before leaf_split child_pos = {}", child_pos);
     auto new_root = it->leaf_split(buffer_pool_manager, key, total_len, parent, pos, &child_pos);
