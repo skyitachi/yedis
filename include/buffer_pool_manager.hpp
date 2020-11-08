@@ -49,6 +49,19 @@ class BufferPoolManager {
   void Pin(Page* page);
   void UnPin(page_id_t page_id);
   void UnPin(Page* page);
+  size_t PinnedSize() const {
+    return pinned_records_.size();
+  }
+  bool IsFull() const {
+    return pinned_records_.size() == pool_size_;
+  }
+  void debug_pinned_records() {
+    printf("pinned records: ");
+    for(auto [page_id, _]: pinned_records_) {
+      printf("%d ", page_id);
+    }
+    printf("\n");
+  }
  private:
   size_t pool_size_;
   YedisInstance* yedis_instance_;

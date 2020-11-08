@@ -32,6 +32,15 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 // NOTE: only root node can add key
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
+  if (buffer_pool_manager->PinnedSize() != 2) {
+    // 不考虑并发的话，之后meta和root会被pin住
+    // DELETE: debug
+    buffer_pool_manager->Flush();
+    buffer_pool_manager->debug_pinned_records();
+    assert(buffer_pool_manager->PinnedSize() == 2);
+  } else {
+    assert(!buffer_pool_manager->IsFull());
+  }
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
   assert(target_leaf_page->Pinned());
@@ -99,11 +108,15 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         buffer_pool_manager->Pin(new_root);
         *root = new_root;
         // look from new root
+        // prevent nerver unpin
+        buffer_pool_manager->UnPin(it);
         it = new_root;
       } else {
         assert(parent != nullptr && pos != -1);
         it->index_split(buffer_pool_manager, parent, pos);
         // TODO: need test
+        // prevent nerver unpin
+        buffer_pool_manager->UnPin(it);
         it = parent;
       }
     }
@@ -181,6 +194,10 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
       SPDLOG_INFO("target leaf node page_id: {}, available={}", parent->GetChild(pos), child_page->GetAvailable());
       buffer_pool_manager->Pin(child_page);
+      if (parent != *root) {
+        // NOTE: important
+        buffer_pool_manager->UnPin(parent);
+      }
       return reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetChild(pos)));
     }
 //    debug_available(buffer_pool_manager);
@@ -189,12 +206,22 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     auto child_page_id = parent->GetChild(child_pos);
     auto child_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_page_id));
     buffer_pool_manager->Pin(child_page);
+    if (parent != *root) {
+      // NOTE: important
+      buffer_pool_manager->UnPin(parent);
+    }
     assert(child_page->IsLeafNode());
     SPDLOG_INFO("[{}] target leaf node page_id: {}, available={}", key, child_page_id, child_page->GetAvailable());
     return child_page;
+  } else {
+    // leaf node没有满直接返回
+    // it was pinned in the last loop
+    if (parent != nullptr && parent != *root) {
+      // NOTE: important
+      buffer_pool_manager->UnPin(parent);
+    }
+
   }
-  // leaf node没有满直接返回
-  // it was pinned in the last loop
   return it;
 }
 
