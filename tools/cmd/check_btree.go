@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -81,6 +82,13 @@ func ReadPage(page_id int32, btreeFile *os.File) {
 			log.Fatalf("read entry seek error %+v", err)
 		}
 		log.Printf("[leaf] [page_id %+v] available=%+v, entryCount=%+v", real_page_id, avaiable, entryCount)
+		for i := 0; i < int(entryCount); i++ {
+			entry, err := ReadEntry(rootReader)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("[page_id %+v] entry key: %+v, entry value len: %+v", real_page_id, entry.Key, len(entry.Value))
+		}
 		return
 	}
 	// index node
@@ -132,4 +140,36 @@ func ReadIndexNode(reader *bytes.Reader, count int, degree int) (keys []int64, c
 	}
 	return
 
+}
+
+type Entry struct {
+	Key   int64
+	VLen  uint32
+	Value []byte
+}
+
+func ReadEntry(reader *bytes.Reader) (*Entry, error) {
+	entry := &Entry{}
+	var key int64
+	err := binary.Read(reader, binary.LittleEndian, &key)
+	if err != nil {
+		return nil, err
+	}
+	// log.Println("read entry key: ", key)
+	entry.Key = key
+	var vLen uint32
+	err = binary.Read(reader, binary.LittleEndian, &vLen)
+	if err != nil {
+		return nil, err
+	}
+	entry.VLen = vLen
+	entry.Value = make([]byte, vLen)
+	n, err := reader.Read(entry.Value)
+	if err != nil {
+		return nil, err
+	}
+	if n != int(vLen) {
+		return nil, fmt.Errorf("not enough data: vLen=%d, read=%d", vLen, n)
+	}
+	return entry, nil
 }

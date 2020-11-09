@@ -57,7 +57,6 @@ func ReadEntry(reader *bytes.Reader) (*Entry, error) {
 	return entry, nil
 }
 
-// TODO: flag的位置要调整
 func ReadIndexNode(reader *bytes.Reader, count int, degree int) (keys []int64, childs []int32, err error) {
 	keyBytes := make([]byte, count*8)
 	_, err = reader.Read(keyBytes)
