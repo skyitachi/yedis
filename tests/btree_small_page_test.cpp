@@ -41,7 +41,7 @@ class BTreeSmallPageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-//    root->destroy();
+    root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -68,7 +68,6 @@ TEST_F(BTreeSmallPageTest, NormalInsert) {
   }
 }
 
-// TODO: failed
 TEST_F(BTreeSmallPageTest, SplitInsert) {
   int limit = 10;
   std::string* big_value = new std::string();
@@ -86,6 +85,25 @@ TEST_F(BTreeSmallPageTest, SplitInsert) {
     ASSERT_EQ(tmp, *big_value);
   }
 }
+
+TEST_F(BTreeSmallPageTest, DebugFixedCase8) {
+  int limit = 10;
+  std::string* big_value = new std::string();
+
+  test::RandomString(rnd, rnd->IntN(options.page_size / 2) + 1, big_value);
+  for (int i = 0; i < limit; i++) {
+    SPDLOG_INFO("before inserted key {}", i);
+    auto s = root->add(i, *big_value);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(i, &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *big_value);
+  }
+}
+
 
 TEST_F(BTreeSmallPageTest, DebugFixedCase1) {
   int64_t keys[] = {3, 5, 1, 4, 2};
@@ -264,7 +282,6 @@ TEST_F(BTreeSmallPageTest, RandomInsert) {
   }
 }
 
-// TODO: failed
 TEST_F(BTreeSmallPageTest, RandomBigInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 300;

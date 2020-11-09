@@ -102,7 +102,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   while(!it->IsLeafNode()) {
     if (it->IsFull()) {
       SPDLOG_INFO("[{}] found index node={} full", key, it->GetPageID());
-      if (*root == this) {
+      if (*root == it) {
         // 当前index node就是根节点
         auto new_root = it->index_split(buffer_pool_manager, nullptr, 0);
         buffer_pool_manager->Pin(new_root);
@@ -246,6 +246,7 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
     new_index_page->SetParentPageID(new_root->GetPageID());
     return new_root;
   }
+  SPDLOG_INFO("with parent {}", parent->GetPageID());
   new_index_page->SetParentPageID(parent->GetPageID());
   parent->index_node_add_child(child_idx, mid_key, child_idx + 1, new_index_page->GetPageID());
   return nullptr;
@@ -668,6 +669,7 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, pa
 
   SetIsDirty(true);
   SetCurrentEntries(n_entry + 1);
+  SPDLOG_INFO("[page_id {}] after add child entries {}", GetPageID(), GetCurrentEntries());
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
