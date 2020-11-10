@@ -137,6 +137,8 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       buffer_pool_manager->UnPin(parent);
     }
     printf("result = %p, key_start = %p\n", result, key_start);
+    // NOTE: 实时更新parent_id
+    it->SetParentPageID(parent->GetPageID());
     parent = it;
     if (result != key_end) {
       // found
@@ -248,6 +250,7 @@ BTreeNodePage* BTreeNodePage::index_split(BufferPoolManager* buffer_pool_manager
   }
   SPDLOG_INFO("with parent {}", parent->GetPageID());
   new_index_page->SetParentPageID(parent->GetPageID());
+  // parent never overflow
   parent->index_node_add_child(child_idx, mid_key, child_idx + 1, new_index_page->GetPageID());
   return nullptr;
 }
@@ -312,7 +315,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       SetParentPageID(parent->GetPageID());
       new_leaf_page->SetParentPageID(parent->GetPageID());
       assert(child_idx >= 0);
-      // NOTE: always new_leaf_page
+      // NOTE: always new_leaf_page, parent never overflow
       parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
       return nullptr;
@@ -350,7 +353,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       SetParentPageID(parent->GetPageID());
       new_leaf_page->SetParentPageID(parent->GetPageID());
       assert(child_idx >= 0);
-      // NOTE: always new_leaf_page
+      // NOTE: always new_leaf_page, parent never overflow
       parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
       buffer_pool_manager->UnPin(new_leaf_page);
       return nullptr;
@@ -391,7 +394,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         SetParentPageID(parent->GetPageID());
         new_leaf_page->SetParentPageID(parent->GetPageID());
         assert(child_idx >= 0);
-        // NOTE: always new_leaf_page
+        // NOTE: always new_leaf_page, parent never overflow
         parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
         buffer_pool_manager->UnPin(new_leaf_page);
         return nullptr;
@@ -431,7 +434,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         SetParentPageID(parent->GetPageID());
         new_leaf_page->SetParentPageID(parent->GetPageID());
         assert(child_idx >= 0);
-        // NOTE: always new_leaf_page
+        // NOTE: always new_leaf_page, parent never overflow
         parent->index_node_add_child(child_idx, mid_key, child_pos, new_leaf_page->GetPageID());
         buffer_pool_manager->UnPin(new_leaf_page);
         buffer_pool_manager->UnPin(this);
@@ -475,11 +478,19 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         SetParentPageID(parent->GetPageID());
         new_leaf_page->SetParentPageID(parent->GetPageID());
         assert(child_idx >= 0);
-        // NOTE: always new_leaf_page
-        parent->index_node_add_child(child_idx, prev_key, child_idx + 1, single_page->GetPageID());
-        parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, new_leaf_page->GetPageID());
+        auto single_page_id = single_page->GetPageID();
+        auto new_leaf_page_id = new_leaf_page->GetPageID();
+        // unpin as soon as possible
         buffer_pool_manager->UnPin(single_page);
         buffer_pool_manager->UnPin(new_leaf_page);
+        // NOTE: always new_leaf_page, parent never overflow
+        parent->index_node_add_child(child_idx, prev_key, child_idx + 1, single_page_id);
+        // TODO: parent maybe overflow, need parent's parent
+        // TODO: parent == root, parent has grandparent?
+        auto grandparent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetParentPageID()));
+        buffer_pool_manager->Pin(grandparent);
+        parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, new_leaf_page_id, grandparent);
+
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
@@ -650,7 +661,8 @@ BTreeNodePage* BTreeNodePage::NewIndexPageFrom(BufferPoolManager* buffer_pool_ma
 }
 
 // NOTE: child should be new page_id
-void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, page_id_t child) {
+// NOTE: need index_split
+void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, page_id_t child, BTreeNodePage* parent) {
   assert(pos >= 0);
   auto key_start = KeyPosStart();
   auto n_entry = GetCurrentEntries();
@@ -668,7 +680,9 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, pa
   child_start[child_pos] = child;
 
   SetIsDirty(true);
+  // POST ASSERT
   SetCurrentEntries(n_entry + 1);
+  assert(GetCurrentEntries() <= GetDegree());
   SPDLOG_INFO("[page_id {}] after add child entries {}", GetPageID(), GetCurrentEntries());
 }
 
