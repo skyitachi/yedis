@@ -500,6 +500,8 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           }
           assert(target_index_page_id != INVALID_PAGE_ID);
           // TODO: insert new_key to target_index_page_id
+          target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
+          target_index_page->index_node_add_child(new_key, new_leaf_page_id);
           return new_root;
         }
         auto grandparent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetParentPageID()));
@@ -510,8 +512,8 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         auto idx_pos = std::lower_bound(grandparent->KeyPosStart(), grandparent->KeyPosStart() + grandparent->GetCurrentEntries(), first);
         auto idx = idx_pos - grandparent->KeyPosStart();
         SPDLOG_INFO("parent {} is grandparent {} 's {} child", parent->GetPageID(), grandparent->GetPageID(), idx);
-        // TODO: idx + 1 or idx
-        parent->index_split(buffer_pool_manager, grandparent, idx + 1);
+        // TODO: idx + 1 or idx, idx  just key pos
+        parent->index_split(buffer_pool_manager, grandparent, idx);
         auto target_index_page_id = INVALID_PAGE_ID;
         if (new_key > grandparent->GetKey(idx)) {
           target_index_page_id = grandparent->GetChild(idx + 1);
@@ -520,7 +522,8 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         }
         assert(target_index_page_id != INVALID_PAGE_ID);
         // TODO: insert new_key to target_index_page_id
-
+        auto target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
+        target_index_page->index_node_add_child(new_key, new_leaf_page_id);
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
@@ -713,6 +716,11 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, pa
   SetCurrentEntries(n_entry + 1);
   assert(GetCurrentEntries() <= GetDegree());
   SPDLOG_INFO("[page_id {}] after add child entries {}", GetPageID(), GetCurrentEntries());
+}
+
+// TODO: implement
+void BTreeNodePage::index_node_add_child(int64_t key, page_id_t child) {
+
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
