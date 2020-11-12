@@ -105,8 +105,16 @@ namespace yedis {
       return options_.page_size - GetAvailable() - LEAF_HEADER_SIZE;
     }
     
-    inline uint32_t MaxAvaiable() {
+    inline uint32_t MaxAvailable() {
       return options_.page_size - LEAF_HEADER_SIZE;
+    }
+
+    inline int lower_bound_index(int64_t key) {
+      assert(!IsLeafNode());
+      auto key_start = KeyPosStart();
+      auto entries = GetCurrentEntries();
+      auto it = std::lower_bound(key_start, key_start + entries, key);
+      return it - key_start;
     }
 
     // interface

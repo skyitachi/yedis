@@ -36,4 +36,4 @@ yet another rocksdb based redis, let's call it `yedis`
 3. [ ] index要满的情况，leaf_split可能会导致，index要add 2次child，所以有可能导致index也会满掉的场景
 4. [x] pin and unpin logic
 5. [ ] ParentID的准确性定义: 保证搜索路径上的parent_id的正确应该就足够了, 不能保证每个parent_id的正确性
-    
+6. [ ] 需要增加index_page的pretty print debug  

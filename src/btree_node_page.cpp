@@ -44,7 +44,7 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   assert(target_leaf_page != nullptr);
   assert(target_leaf_page->Pinned());
-  assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvaiable());
+  assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvailable());
 
   SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
@@ -137,7 +137,9 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     }
     printf("result = %p, key_start = %p\n", result, key_start);
     // NOTE: 实时更新parent_id
-    it->SetParentPageID(parent->GetPageID());
+    if (parent != nullptr) {
+      it->SetParentPageID(parent->GetPageID());
+    }
     parent = it;
     if (result != key_end) {
       // found
@@ -154,13 +156,18 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     // NOTE: make sure parent and leaf node is pinned
     buffer_pool_manager->Pin(it);
   }
+  if (parent != nullptr) {
+    // NOTE: make parent relation right
+    it->SetParentPageID(parent->GetPageID());
+  }
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
     // debug_available(buffer_pool_manager);
     int child_pos = pos + 1;
-    SPDLOG_INFO("before leaf_split child_pos = {}", child_pos);
+    SPDLOG_INFO("before leaf_split child_pos = {}, parent page_id = {}", child_pos, it->GetParentPageID());
+    // NOTE: leaf_split will change parent relation
     auto new_root = it->leaf_split(buffer_pool_manager, key, total_len, parent, pos, &child_pos);
-    SPDLOG_INFO("after leaf_split child_pos = {}", child_pos);
+    SPDLOG_INFO("after leaf_split child_pos = {}, parent page_id = {}", child_pos, it->GetParentPageID());
     // debug_available(buffer_pool_manager);
     // *root will never be nullptr
     // TODO: the following line is unnecessary
@@ -180,15 +187,24 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     if (parent == nullptr) {
       // NOTE: root or new_root always be pinned, so parent is pinned
       parent = *root;
-    } else {
-      // NOTE: UnPin it as soon as possible
-      buffer_pool_manager->UnPin(it);
     }
     assert(parent != nullptr);
+    // NOTE: leaf split will change parent relation
+    if (it->GetParentPageID() != parent->GetPageID()) {
+      buffer_pool_manager->UnPin(parent);
+      parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(it->GetParentPageID()));
+      assert(parent != nullptr);
+      // NOTE: update new pos
+      pos = parent->lower_bound_index(key);
+      buffer_pool_manager->Pin(parent);
+    }
     assert(parent->Pinned());
+    // unpin it as soon as possible
+    buffer_pool_manager->UnPin(it);
     // debug_available(buffer_pool_manager);
-    SPDLOG_INFO("root page_id={}, new_root entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
-    SPDLOG_INFO("root page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
+    SPDLOG_INFO("parent page_id={}, parent entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
+    // TODO: pos need to update
+    SPDLOG_INFO("parent page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
     SPDLOG_INFO("current_key = {}, pos_key = {}", key, parent->GetKey(pos));
     // NOTE: important
     if (key <= parent->GetKey(pos)) {
@@ -274,7 +290,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
   auto it = start;
   auto prev_key = it.key();
   auto sz = 0;
-  auto used = MaxAvaiable() - GetAvailable();
+  auto used = MaxAvailable() - GetAvailable();
   std::vector<int64_t > child_keys;
   std::vector<page_id_t> child_page_ids;
   page_id_t right;
@@ -367,7 +383,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       return new_index_page;
     }
   } else {
-    if (sz + total_size <= MaxAvaiable())  {
+    if (sz + total_size <= MaxAvailable())  {
       SPDLOG_INFO("leaf_split insert node with left child, key: {}", new_key);
       // 放入前一个node上
       mid_key = new_key;
@@ -381,7 +397,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       child_page_ids.push_back(GetPageID());
       child_page_ids.push_back(new_leaf_page->GetPageID());
 
-      SetAvailable(MaxAvaiable() - sz);
+      SetAvailable(MaxAvailable() - sz);
       new_leaf_page->SetPrevPageID(GetPageID());
       new_leaf_page->SetNextPageID(GetNextPageID());
       SetNextPageID(new_leaf_page->GetPageID());
@@ -406,7 +422,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         return new_index_page;
       }
 
-    } else if (used - sz + total_size <= MaxAvaiable()) {
+    } else if (used - sz + total_size <= MaxAvailable()) {
       // 放入后一个node中
       SPDLOG_INFO("leaf_split insert node with right child, key: {}, prev_key: {}", new_key, prev_key);
       mid_key = prev_key;
@@ -415,7 +431,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
       buffer_pool_manager->Pin(new_leaf_page);
       SetCurrentEntries(count);
-      SetAvailable(MaxAvaiable() - sz);
+      SetAvailable(MaxAvailable() - sz);
 
       child_keys.push_back(mid_key);
       child_page_ids.push_back(GetPageID());
@@ -449,13 +465,14 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
     } else {
       // 只能新建一个page来存储new_key
       // 要插入两个page
+      SPDLOG_INFO("need 2 page to storage new_key");
       auto single_page = NewLeafPage(buffer_pool_manager, 0, it, it);
       buffer_pool_manager->Pin(single_page);
       assert(single_page->IsLeafNode());
       new_leaf_page = NewLeafPage(buffer_pool_manager, n_entries - count, it, end);
       buffer_pool_manager->Pin(new_leaf_page);
       SetCurrentEntries(count);
-      SetAvailable(MaxAvaiable() - sz);
+      SetAvailable(MaxAvailable() - sz);
 
       child_keys.push_back(prev_key);
       child_keys.push_back(new_key);
@@ -474,34 +491,52 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
       *ret_child_pos = child_idx + 1;
 
       if (parent != nullptr) {
-        SetParentPageID(parent->GetPageID());
+        // TODO: parent update has some problem
+        single_page->SetParentPageID(parent->GetPageID());
         new_leaf_page->SetParentPageID(parent->GetPageID());
         assert(child_idx >= 0);
         auto single_page_id = single_page->GetPageID();
         auto new_leaf_page_id = new_leaf_page->GetPageID();
-        // unpin as soon as possible
-        buffer_pool_manager->UnPin(single_page);
-        buffer_pool_manager->UnPin(new_leaf_page);
         // NOTE: always new_leaf_page, parent never overflow
         parent->index_node_add_child(child_idx, prev_key, child_idx + 1, single_page_id);
-        // TODO: parent maybe overflow, need parent's parent
-        // TODO: parent == root, parent has grandparent?
+        if (!parent->IsFull()) {
+          // NOTE: parent can add more child
+          // TODO: need test case
+          parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, new_leaf_page_id);
+          return nullptr;
+        }
+        SPDLOG_INFO("parent {} is full", parent->GetPageID());
         if (parent->GetParentPageID() == INVALID_PAGE_ID) {
+          SPDLOG_INFO("parent {} was root page", parent->GetPageID());
           // NOTE: parent is root page
           auto new_root = parent->index_split(buffer_pool_manager, nullptr, INVALID_PAGE_ID);
+          // NOTE: judge current page is in new_root's left or right
           buffer_pool_manager->Pin(new_root);
           BTreeNodePage* target_index_page;
-          auto target_index_page_id = INVALID_PAGE_ID;
+          page_id_t target_index_page_id;
           if (new_key > new_root->GetKey(0)) {
             // should insert new root right child
             target_index_page_id = new_root->GetChild(1);
           } else {
             target_index_page_id = new_root->GetChild(0);
           }
+          if (child_idx > GetDegree() / 2) {
+            SPDLOG_INFO("new_page will add the right half");
+            // current page split into right half
+            SetParentPageID(new_root->GetChild(1));
+            single_page->SetParentPageID(new_root->GetChild(1));
+            new_leaf_page->SetParentPageID(new_root->GetChild(1));
+
+            // unpin as soon as possible
+            buffer_pool_manager->UnPin(single_page);
+            buffer_pool_manager->UnPin(new_leaf_page);
+          }
           assert(target_index_page_id != INVALID_PAGE_ID);
-          // TODO: insert new_key to target_index_page_id
+          SPDLOG_INFO("new_target_index_page_id {}", target_index_page_id);
           target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
+          buffer_pool_manager->Pin(target_index_page);
           target_index_page->index_node_add_child(new_key, new_leaf_page_id);
+          buffer_pool_manager->UnPin(target_index_page);
           return new_root;
         }
         auto grandparent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent->GetParentPageID()));
@@ -512,7 +547,6 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         auto idx_pos = std::lower_bound(grandparent->KeyPosStart(), grandparent->KeyPosStart() + grandparent->GetCurrentEntries(), first);
         auto idx = idx_pos - grandparent->KeyPosStart();
         SPDLOG_INFO("parent {} is grandparent {} 's {} child", parent->GetPageID(), grandparent->GetPageID(), idx);
-        // TODO: idx + 1 or idx, idx  just key pos
         parent->index_split(buffer_pool_manager, grandparent, idx);
         auto target_index_page_id = INVALID_PAGE_ID;
         if (new_key > grandparent->GetKey(idx)) {
@@ -521,9 +555,22 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           target_index_page_id = grandparent->GetChild(idx);
         }
         assert(target_index_page_id != INVALID_PAGE_ID);
-        // TODO: insert new_key to target_index_page_id
+
+        // TODO: need test
+        if (child_idx > GetDegree() / 2) {
+          // current page split into right half
+          SetParentPageID(grandparent->GetChild(idx + 1));
+          single_page->SetParentPageID(grandparent->GetChild(idx + 1));
+          new_leaf_page->SetParentPageID(grandparent->GetChild(idx + 1));
+          // unpin as soon as possible
+          buffer_pool_manager->UnPin(single_page);
+          buffer_pool_manager->UnPin(new_leaf_page);
+        }
+
         auto target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
+        buffer_pool_manager->Pin(target_index_page);
         target_index_page->index_node_add_child(new_key, new_leaf_page_id);
+        buffer_pool_manager->UnPin(target_index_page);
         return nullptr;
       } else {
         auto new_index_page = NewIndexPage(buffer_pool_manager, child_keys, child_page_ids);
@@ -614,7 +661,7 @@ BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manage
   // 设置entries
   next_page->SetCurrentEntries(cnt);
   auto right_child = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(right));
-  SPDLOG_INFO("after new index node page_id = {}, available = {}", right_child->GetPageID(), right_child->GetAvailable());
+  SPDLOG_INFO("after new index node right page_id = {}, available = {}", right_child->GetPageID(), right_child->GetAvailable());
   return next_page;
 }
 
@@ -632,9 +679,9 @@ BTreeNodePage* BTreeNodePage::NewLeafPage(BufferPoolManager* buffer_pool_manager
     auto copied_sz = end.data_ - start.data_;
     // NOTE: 应该从entry start开始复制
     memcpy(next_page->EntryPosStart(), start.data_, copied_sz);
-    next_page->SetAvailable(MaxAvaiable() - copied_sz);
+    next_page->SetAvailable(MaxAvailable() - copied_sz);
   } else {
-    next_page->SetAvailable(MaxAvaiable());
+    next_page->SetAvailable(MaxAvailable());
   }
   next_page->SetIsDirty(true);
   next_page->SetNextPageID(INVALID_PAGE_ID);
@@ -718,9 +765,18 @@ void BTreeNodePage::index_node_add_child(int pos, int64_t key, int child_pos, pa
   SPDLOG_INFO("[page_id {}] after add child entries {}", GetPageID(), GetCurrentEntries());
 }
 
-// TODO: implement
+// NOTE: just for one page key
 void BTreeNodePage::index_node_add_child(int64_t key, page_id_t child) {
+  assert(!IsLeafNode());
+  assert(!IsFull());
+  auto key_start = KeyPosStart();
+  auto key_end = key_start + GetCurrentEntries();
+  auto it = std::lower_bound(key_start, key_end, key);
 
+  auto idx = it - key_start;
+  SPDLOG_INFO("new_key in the index {}", idx);
+  // TODO: need test child = key_idx + 1
+  index_node_add_child(idx, key, idx + 1, child, nullptr);
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
