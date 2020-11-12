@@ -282,6 +282,28 @@ TEST_F(BTreeSmallPageTest, IndexNodeAddChildWithIndexSplit) {
   }
 }
 
+TEST_F(BTreeSmallPageTest, IndexNodeAddChildWithIndexSplit_Normal) {
+  int64_t keys[] = {0, 1, 3, 4, 5, 6, 2};
+  int lens[] = {70, 10, 60, 70, 70, 70, 70};
+  int limit = 7;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
 TEST_F(BTreeSmallPageTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
   int limit = 15;

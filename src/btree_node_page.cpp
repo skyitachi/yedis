@@ -113,6 +113,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         it = new_root;
       } else {
         assert(parent != nullptr && pos != -1);
+        assert(parent->Pinned());
         it->index_split(buffer_pool_manager, parent, pos);
         // prevent nerver unpin
         buffer_pool_manager->UnPin(it);
@@ -177,7 +178,10 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       if (new_root != nullptr) {
         buffer_pool_manager->Pin(new_root);
         // NOTE: only one leaf node meet with split will cause it unpinned
-        buffer_pool_manager->UnPin(*root);
+        if (*root != parent) {
+          // NOTE: prevent unpin parent
+          buffer_pool_manager->UnPin(*root);
+        }
         SPDLOG_INFO("search found new root: {}", new_root->GetPageID());
         *root = new_root;
       } else {
@@ -191,6 +195,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     assert(parent != nullptr);
     // NOTE: leaf split will change parent relation
     if (it->GetParentPageID() != parent->GetPageID()) {
+      SPDLOG_INFO("found new parent origin {}, current {}", it->GetParentPageID(), parent->GetPageID());
       buffer_pool_manager->UnPin(parent);
       parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(it->GetParentPageID()));
       assert(parent != nullptr);
@@ -520,8 +525,8 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           } else {
             target_index_page_id = new_root->GetChild(0);
           }
-          if (child_idx > GetDegree() / 2) {
-            SPDLOG_INFO("new_page will add the right half");
+          if (child_idx > MAX_DEGREE / 2) {
+            SPDLOG_INFO("new_page will add the right half, child_idx {}", child_idx);
             // current page split into right half
             SetParentPageID(new_root->GetChild(1));
             single_page->SetParentPageID(new_root->GetChild(1));
@@ -533,6 +538,12 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           }
           assert(target_index_page_id != INVALID_PAGE_ID);
           SPDLOG_INFO("new_target_index_page_id {}", target_index_page_id);
+          // NOTE: target_index_page_id maybe same as parent
+          if (target_index_page_id == parent->GetPageID()) {
+            SPDLOG_INFO("found target index page id equals parent {}", target_index_page_id);
+            parent->index_node_add_child(new_key, new_leaf_page_id);
+            return new_root;
+          }
           target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
           buffer_pool_manager->Pin(target_index_page);
           target_index_page->index_node_add_child(new_key, new_leaf_page_id);
@@ -557,7 +568,8 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
         assert(target_index_page_id != INVALID_PAGE_ID);
 
         // TODO: need test
-        if (child_idx > GetDegree() / 2) {
+        if (child_idx > MAX_DEGREE / 2) {
+          SPDLOG_INFO("child idx {} will split into right page", child_idx);
           // current page split into right half
           SetParentPageID(grandparent->GetChild(idx + 1));
           single_page->SetParentPageID(grandparent->GetChild(idx + 1));
