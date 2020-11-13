@@ -61,6 +61,7 @@ class BufferPoolManager {
       printf("%d ", page_id);
     }
     printf("\n");
+    fflush(stdout);
   }
  private:
   size_t pool_size_;

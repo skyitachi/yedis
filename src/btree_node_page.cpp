@@ -164,6 +164,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
     // debug_available(buffer_pool_manager);
+    // TODO: child_pos has some problem
     int child_pos = pos + 1;
     SPDLOG_INFO("before leaf_split child_pos = {}, parent page_id = {}", child_pos, it->GetParentPageID());
     // NOTE: leaf_split will change parent relation
@@ -200,7 +201,11 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(it->GetParentPageID()));
       assert(parent != nullptr);
       // NOTE: update new pos
+      // TODO: pos maybe equals to entries count
       pos = parent->lower_bound_index(key);
+      if (pos == parent->GetCurrentEntries()) {
+        SPDLOG_INFO("found new biggest key: {}, parent_id {}", key, parent->GetPageID());
+      }
       buffer_pool_manager->Pin(parent);
     }
     assert(parent->Pinned());
@@ -208,7 +213,6 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     buffer_pool_manager->UnPin(it);
     // debug_available(buffer_pool_manager);
     SPDLOG_INFO("parent page_id={}, parent entries: {}, degree: {}", parent->GetPageID(), parent->GetCurrentEntries(), parent->GetDegree());
-    // TODO: pos need to update
     SPDLOG_INFO("parent page_id={},  pos: {}, index key: {}, first key: {}", parent->GetPageID(), pos, parent->GetKey(pos), parent->GetKey(0));
     SPDLOG_INFO("current_key = {}, pos_key = {}", key, parent->GetKey(pos));
     // NOTE: important
@@ -508,6 +512,9 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           // NOTE: parent can add more child
           // TODO: need test case
           parent->index_node_add_child(child_idx + 1, new_key, child_idx + 2, new_leaf_page_id);
+          // unpin as soon as possible
+          buffer_pool_manager->UnPin(single_page);
+          buffer_pool_manager->UnPin(new_leaf_page);
           return nullptr;
         }
         SPDLOG_INFO("parent {} is full", parent->GetPageID());
@@ -531,11 +538,10 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
             SetParentPageID(new_root->GetChild(1));
             single_page->SetParentPageID(new_root->GetChild(1));
             new_leaf_page->SetParentPageID(new_root->GetChild(1));
-
-            // unpin as soon as possible
-            buffer_pool_manager->UnPin(single_page);
-            buffer_pool_manager->UnPin(new_leaf_page);
           }
+          // unpin as soon as possible
+          buffer_pool_manager->UnPin(single_page);
+          buffer_pool_manager->UnPin(new_leaf_page);
           assert(target_index_page_id != INVALID_PAGE_ID);
           SPDLOG_INFO("new_target_index_page_id {}", target_index_page_id);
           // NOTE: target_index_page_id maybe same as parent
@@ -574,10 +580,10 @@ BTreeNodePage* BTreeNodePage::leaf_split(BufferPoolManager* buffer_pool_manager,
           SetParentPageID(grandparent->GetChild(idx + 1));
           single_page->SetParentPageID(grandparent->GetChild(idx + 1));
           new_leaf_page->SetParentPageID(grandparent->GetChild(idx + 1));
-          // unpin as soon as possible
-          buffer_pool_manager->UnPin(single_page);
-          buffer_pool_manager->UnPin(new_leaf_page);
         }
+        // unpin as soon as possible
+        buffer_pool_manager->UnPin(single_page);
+        buffer_pool_manager->UnPin(new_leaf_page);
 
         auto target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
         buffer_pool_manager->Pin(target_index_page);
