@@ -207,6 +207,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         SPDLOG_INFO("found new biggest key: {}, parent_id {}", key, parent->GetPageID());
       }
       buffer_pool_manager->Pin(parent);
+      child_pos = pos;
     }
     assert(parent->Pinned());
     // unpin it as soon as possible
