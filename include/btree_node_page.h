@@ -57,6 +57,7 @@ namespace yedis {
     }
     // set parent id
     inline void SetParentPageID(page_id_t parent) {
+      SPDLOG_INFO("current page {} set to to parent {}", GetPageID(), parent);
       EncodeFixed32(GetData() + PARENT_OFFSET, parent);
     }
 

@@ -53,6 +53,8 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
     buffer_pool_manager->UnPin(target_leaf_page);
   }
   if (buffer_pool_manager->PinnedSize() != 2) {
+    // DELETE: debug
+    buffer_pool_manager->Flush();
     buffer_pool_manager->debug_pinned_records();
     assert(buffer_pool_manager->PinnedSize() == 2);
   }
@@ -121,6 +123,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
         it->index_split(buffer_pool_manager, parent, pos);
         // prevent never unpin
         buffer_pool_manager->UnPin(it);
+        // NOTE: this will make parent equals current page
         it = parent;
       }
     }
@@ -142,7 +145,7 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
     }
     printf("result = %p, key_start = %p\n", result, key_start);
     // NOTE: 实时更新parent_id
-    if (parent != nullptr) {
+    if (parent != nullptr && parent != it) {
       it->SetParentPageID(parent->GetPageID());
     }
     parent = it;
@@ -572,6 +575,11 @@ BTreeNodePage* BTreeNodePage::leaf_split(
         // unpin as soon as possible
         // buffer_pool_manager->UnPin(single_page);
         buffer_pool_manager->UnPin(new_leaf_page);
+        // NOTE: grandparent also need unpin
+        if (grandparent->GetParentPageID() != INVALID_PAGE_ID) {
+          SPDLOG_INFO("unpin grandparent page: {}, current parent_page id: {}", grandparent->GetPageID(), grandparent->GetParentPageID());
+          buffer_pool_manager->UnPin(grandparent);
+        }
 
         auto target_index_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(target_index_page_id));
         buffer_pool_manager->Pin(target_index_page);
