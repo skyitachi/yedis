@@ -360,7 +360,9 @@ TEST_F(BTreeSmallPageTest, RandomBigInsert) {
       presets_.insert(std::pair(key, s));
     }
   }
+  auto count = 0;
   for (const auto it: presets_) {
+    SPDLOG_INFO("inserted key {}, v_len= {}, count = {}", it.first, it.second->size(), count++);
     auto s = root->add(it.first, *it.second);
     ASSERT_TRUE(s.ok());
   }

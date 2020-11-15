@@ -60,6 +60,6 @@ static constexpr int NEXT_NODE_PAGE_ID_OFFSET = 25;
 static constexpr int ENTRY_OFFSET = 29;
 
 // buffer pool manager
-static constexpr int MinPoolSize = 6;
+static constexpr int MinPoolSize = 7;
 }
 #endif //YEDIS_INCLUDE_CONFIG_HPP_

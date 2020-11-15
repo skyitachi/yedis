@@ -19,9 +19,9 @@ class BTreeSmallPoolTest : public testing::Test {
     disk_manager_ = new DiskManager("btree_small_pool_debug.idx", options);
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;
-    // 太小的buffer pool也不够, 当前最小的buffer pool size是6个
+    // 太小的buffer pool也不够, 当前最小的buffer pool size是7个
     // meta page, root, parent, current, new_leaf_node for the split page, new leaf node for the key
-    buffer_pool_manager_ = new BufferPoolManager(6, yedis_instance_, options);
+    buffer_pool_manager_ = new BufferPoolManager(7, yedis_instance_, options);
     yedis_instance_->buffer_pool_manager = buffer_pool_manager_;
     root = new BTree(yedis_instance_);
   }
@@ -42,7 +42,7 @@ class BTreeSmallPoolTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    root->destroy();
+    // root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -253,6 +253,51 @@ TEST_F(BTreeSmallPoolTest, DebugFixedCase9) {
     ASSERT_EQ(tmp, *values[i]);
   }
 }
+
+TEST_F(BTreeSmallPoolTest, DebugFixedCase10) {
+  int64_t keys[] = {5, 4, 9, 12, 1, 11, 8, 6, 7, 3, 10, 2};
+  int lens[] = {36, 43, 60, 48, 19, 37, 18, 34, 53, 22, 56, 63};
+  int limit = 12;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
+TEST_F(BTreeSmallPoolTest, DebugFixedCase11) {
+  int64_t keys[] = {1, 3, 2};
+  int lens[] = {16, 25, 25};
+  int limit = 3;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    std::string *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  for (int i = 0; i < limit; i++) {
+    std::string tmp;
+    auto s = root->read(keys[i], &tmp);
+    ASSERT_TRUE(s.ok());
+    ASSERT_EQ(tmp, *values[i]);
+  }
+}
+
 
 TEST_F(BTreeSmallPoolTest, RandomInsert) {
   std::unordered_map<int64_t, std::string*> presets_;
