@@ -18,6 +18,7 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
     SetAvailable(options_.page_size - LEAF_HEADER_SIZE);
     SetIsDirty(true);
     SetPrevPageID(INVALID_PAGE_ID);
+    SetNextPageID(INVALID_PAGE_ID);
     assert(GetAvailable() == options_.page_size - LEAF_HEADER_SIZE);
   }
   SetPageID(page_id);
@@ -315,7 +316,7 @@ BTreeNodePage* BTreeNodePage::leaf_split(
     // 这里能正确反映插入顺序
     new_leaf_page->SetPrevPageID(GetPrevPageID());
     new_leaf_page->SetNextPageID(GetPageID());
-    SetPrevPageID(new_leaf_page->GetPageID());
+    SetPrevPageID(left);
     *result = new_leaf_page;
 
     if (parent != nullptr) {
@@ -802,6 +803,8 @@ void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_i
   // leaf 节点需要设置available
   if (is_leaf) {
     dst->SetAvailable(options_.page_size - LEAF_HEADER_SIZE);
+    dst->SetNextPageID(INVALID_PAGE_ID);
+    dst->SetPrevPageID(INVALID_PAGE_ID);
   }
   dst->SetParentPageID(INVALID_PAGE_ID);
   SPDLOG_INFO("init page: page_id={}, is_leaf={}, available={}", page_id, is_leaf, dst->GetAvailable());

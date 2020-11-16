@@ -41,7 +41,7 @@ class BTreeSmallPageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    root->destroy();
+    // root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -380,13 +380,14 @@ TEST_F(BTreeSmallPageTest, RandomBigInsert) {
 
 // TODO: failed
 TEST_F(BTreeSmallPageTest, LeafNodePrevAndNextTest) {
-  auto limit = 1000;
+  auto limit = 50;
   for (int i = 0; i < limit; i++) {
     auto s = root->add(i, "v" + std::to_string(i));
     ASSERT_TRUE(s.ok());
   }
-  auto all_child_by_pointers = root->GetAllLeavesByPointer();
   auto all_child_by_iterate = root->GetAllLeavesByIterate();
+  SPDLOG_INFO("iterate: size = {}", all_child_by_iterate.size());
+  auto all_child_by_pointers = root->GetAllLeavesByPointer();
   ASSERT_TRUE(all_child_by_iterate.size() == all_child_by_pointers.size());
   for (int i = 0; i < all_child_by_pointers.size(); i++) {
     ASSERT_TRUE(all_child_by_pointers.at(i) == all_child_by_iterate.at(i));

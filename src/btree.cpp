@@ -48,6 +48,9 @@ Status BTree::init() {
     page_id_t root_page_id;
     root_ = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->NewPage(&root_page_id));
     root_->SetPageID(root_page_id);
+    root_->SetPrevPageID(INVALID_PAGE_ID);
+    root_->SetNextPageID(INVALID_PAGE_ID);
+    root_->SetParentPageID(INVALID_PAGE_ID);
     SPDLOG_INFO("init empty btree root_page_id: {}", root_page_id);
     SPDLOG_INFO("GetPageID from BTreeNodeMethod: {}", root_->GetPageID());
     // Note: Pin Root
@@ -87,11 +90,15 @@ page_id_t BTree::GetFirstLeafPage() {
 
 std::vector<page_id_t> BTree::GetAllLeavesByPointer() {
   auto first = GetFirstLeafPage();
-  assert(first != INVALID_PAGE_ID);
+  assert(first != INVALID_PAGE_ID && first != 0);
   auto ret = std::vector<page_id_t>();
   for (auto it = get_page(first); it != nullptr;) {
     ret.push_back(it->GetPageID());
     auto next_page_id = it->GetNextPageID();
+    if (next_page_id == 0) {
+      SPDLOG_INFO("incorrect pointer: {}, prev: {}", it->GetPageID(), it->GetNextPageID());
+      assert(next_page_id != 0);
+    }
     if (next_page_id == INVALID_PAGE_ID) {
       break;
     }
