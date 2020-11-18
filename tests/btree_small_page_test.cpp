@@ -41,7 +41,7 @@ class BTreeSmallPageTest : public testing::Test {
     SPDLOG_INFO("gtest teardown: success {}", counter);
     Flush();
     ShutDown();
-    // root->destroy();
+    root->destroy();
     delete root;
     delete buffer_pool_manager_;
     delete disk_manager_;
@@ -378,7 +378,6 @@ TEST_F(BTreeSmallPageTest, RandomBigInsert) {
   }
 }
 
-// TODO: failed
 TEST_F(BTreeSmallPageTest, LeafNodePrevAndNextTest) {
   auto limit = 50;
   for (int i = 0; i < limit; i++) {

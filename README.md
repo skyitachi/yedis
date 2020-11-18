@@ -40,3 +40,4 @@ yet another rocksdb based redis, let's call it `yedis`
 7. [x] BTreeSmallPageTest.RandomBigInsert failed
 8. [ ] github-ci
 9. [ ] replay tests
+10. [x] pass BTreeSmallPageTest.LeafNodePrevAndNextTest

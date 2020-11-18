@@ -80,12 +80,12 @@ Status BTree::destroy() {
 
 page_id_t BTree::GetFirstLeafPage() {
   auto root = meta_->GetRootPageId();
-  auto root_page = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(root));
-  if (root_page->IsLeafNode()) {
-    return root;
+  auto it = reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(root));
+  while(!it->IsLeafNode()) {
+    assert(it->GetCurrentEntries() > 0);
+    it = get_page(it->GetChild(0));
   }
-  assert(root_page->GetCurrentEntries() > 0);
-  return root_page->GetChild(0);
+  return it->GetPageID();
 }
 
 std::vector<page_id_t> BTree::GetAllLeavesByPointer() {
@@ -96,7 +96,6 @@ std::vector<page_id_t> BTree::GetAllLeavesByPointer() {
     ret.push_back(it->GetPageID());
     auto next_page_id = it->GetNextPageID();
     if (next_page_id == 0) {
-      SPDLOG_INFO("incorrect pointer: {}, prev: {}", it->GetPageID(), it->GetNextPageID());
       assert(next_page_id != 0);
     }
     if (next_page_id == INVALID_PAGE_ID) {

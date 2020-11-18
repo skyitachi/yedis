@@ -36,8 +36,8 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   if (buffer_pool_manager->PinnedSize() != 2) {
     // 不考虑并发的话，之后meta和root会被pin住
     // DELETE: debug
-    buffer_pool_manager->Flush();
     buffer_pool_manager->debug_pinned_records();
+    buffer_pool_manager->Flush();
     assert(buffer_pool_manager->PinnedSize() == 2);
   } else {
     assert(!buffer_pool_manager->IsFull());

@@ -93,6 +93,8 @@ namespace yedis {
     }
 
     inline void SetNextPageID(page_id_t page_id) {
+      SPDLOG_INFO("current page_id {}, next_page_id {}", GetPageID(), page_id);
+      assert(page_id != 0);
       EncodeFixed32(GetData() + NEXT_NODE_PAGE_ID_OFFSET, page_id);
     }
 
