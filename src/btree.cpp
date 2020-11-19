@@ -69,6 +69,8 @@ Status BTree::init() {
   }
   root_->init(root_->GetDegree(), root_page_id);
 
+  yedis_instance_->buffer_pool_manager->Pin(root_);
+
   spdlog::info("open btree successfully with page_id {}", root_page_id);
   return Status::OK();
 }

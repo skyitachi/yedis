@@ -33,6 +33,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 // NOTE: only root node can add key
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
+
   if (buffer_pool_manager->PinnedSize() != 2) {
     // 不考虑并发的话，之后meta和root会被pin住
     // DELETE: debug
@@ -43,7 +44,10 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
     assert(!buffer_pool_manager->IsFull());
   }
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
-  assert(target_leaf_page != nullptr);
+  if (target_leaf_page == nullptr) {
+    // NOTE: just for current design
+    return Status::NotSupported(Status::SubCode::kNone);
+  }
   assert(target_leaf_page->Pinned());
   assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvailable());
 
@@ -168,6 +172,16 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
   if (parent != nullptr) {
     // NOTE: make parent relation right
     it->SetParentPageID(parent->GetPageID());
+  }
+  if (it->leaf_exists(key)) {
+    if (parent != nullptr && parent != *root) {
+      // NOTE: important
+      buffer_pool_manager->UnPin(parent);
+    }
+    if (it != *root) {
+      buffer_pool_manager->UnPin(it);
+    }
+    return nullptr;
   }
   if (it->IsFull(total_len)) {
     SPDLOG_INFO("page {} leaf node is full", it->GetPageID());
@@ -656,6 +670,22 @@ Status BTreeNodePage::leaf_search(int64_t target, std::string *dst) {
     }
   }
   return Status::NotFound();
+}
+
+bool BTreeNodePage::leaf_exists(int64_t target) {
+  assert(IsLeafNode());
+  int n_entries = GetCurrentEntries();
+  SPDLOG_INFO("current page_id: {}, current_entries: {}, available={}", GetPageID(), n_entries, GetAvailable());
+  auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
+  BTreeNodeIter start(entry_pos_start);
+  BTreeNodeIter end(entry_pos_start + GetEntryTail());
+  for (auto it = start; it != end; it++) {
+    if (it.key() == target) {
+      SPDLOG_INFO("key: {}, value_size: {}", target, it.value_size());
+      return true;
+    }
+  }
+  return false;
 }
 
 // TODO: make static method

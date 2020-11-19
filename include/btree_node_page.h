@@ -145,6 +145,8 @@ namespace yedis {
 
     // leaf node search key
     Status leaf_search(int64_t key, std::string *dst);
+    // check key exists
+    bool leaf_exists(int64_t key);
 
     void debug_available(BufferPoolManager*); 
     class EntryIterator {
