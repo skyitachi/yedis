@@ -825,6 +825,79 @@ void BTreeNodePage::index_node_add_child(int64_t key, page_id_t child) {
   index_node_add_child(idx, key, idx + 1, child, nullptr);
 }
 
+Status BTreeNodePage::remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root) {
+  auto it = this;
+  BTreeNodePage* parent = nullptr;
+  while (!it->IsLeafNode()) {
+    int64_t* key_start = it->KeyPosStart();
+    int n_keys = it->GetCurrentEntries();
+    auto child_start = it->ChildPosStart();
+    auto key_end = key_start + n_keys;
+    auto found = std::lower_bound(key_start, key_end, key);
+    auto pos = found - key_start;
+    assert(pos <= it->GetCurrentEntries());
+    parent = it;
+    it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
+    if (parent != nullptr) {
+      it->SetParentPageID(parent->GetPageID());
+    }
+  }
+  assert(it->IsLeafNode());
+  return leaf_remove(buffer_pool_manager, key, root);
+}
+
+Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root) {
+  assert(IsLeafNode());
+  //
+  auto entry_pos_start = reinterpret_cast<char *>(EntryPosStart());
+  BTreeNodeIter start(entry_pos_start);
+  BTreeNodeIter end(entry_pos_start + GetEntryTail());
+  auto total = GetEntryTail();
+  size_t offset = 0;
+  bool found = false;
+  auto total_size = 0;
+  for(auto it = start; it != end; it++) {
+    if (key == it.key()) {
+      found = true;
+      total_size = it.size();
+      break;
+    }
+    offset += it.size();
+  }
+  if (!found) {
+    SPDLOG_INFO("leaf {} not found key {}", GetPageID(), key);
+    return Status::NotFound();
+  }
+  auto left = total - offset - total_size;
+  if (left != 0) {
+    memmove(entry_pos_start + offset, entry_pos_start + total_size + offset, left);
+  }
+  SetAvailable(GetAvailable() + total_size);
+  if (total > total_size) {
+    SPDLOG_INFO("page_id={} success delete key {}", GetPageID(), key);
+    return Status::OK();
+  }
+  SPDLOG_INFO("page_id={} will be empty page", GetPageID());
+  if (*root == this) {
+    // root page is empty
+    SPDLOG_INFO("root_page {} is empty", GetPageID());
+    return Status::OK();
+  }
+  // empty leaf_page, will cause parent to remove child
+  auto parent_id = GetParentPageID();
+  assert(parent_id != INVALID_PAGE_ID);
+  
+  auto parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent_id));
+  auto key_pos = std::lower_bound(parent->KeyPosStart(), parent->KeyPosStart() + parent->GetCurrentEntries(), key);
+  auto child_index = key_pos - parent->KeyPosStart();
+  return parent->index_remove(buffer_pool_manager, child_index, root);
+}
+
+// NOTE：这里的逻辑最复杂
+Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int child_idx, BTreeNodePage** root) {
+  return Status::NotSupported();
+}
+
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {
   dst->SetPageID(page_id);
   dst->SetDegree(degree);

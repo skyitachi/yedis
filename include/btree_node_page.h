@@ -148,6 +148,12 @@ namespace yedis {
     // check key exists
     bool leaf_exists(int64_t key);
 
+    Status leaf_remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root);
+    // index_page remove maybe recursive
+    Status index_remove(BufferPoolManager*, int child_idx, BTreeNodePage** root);
+
+    Status remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root);
+
     void debug_available(BufferPoolManager*); 
     class EntryIterator {
      public:
