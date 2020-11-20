@@ -41,3 +41,6 @@ yet another rocksdb based redis, let's call it `yedis`
 8. [ ] github-ci
 9. [ ] replay tests
 10. [x] pass BTreeSmallPageTest.LeafNodePrevAndNextTest
+
+
+11. [ ] test
