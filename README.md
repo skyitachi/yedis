@@ -27,7 +27,7 @@ yet another rocksdb based redis, let's call it `yedis`
 
 #### 设计测试程序
 - [x] random inseret
-- [ ] small page_size test
+- [x] small page_size test
 
 #### bugs
 1. [x] current page_id will be wrong after page return back to memory, if not call SetPageID implicitly
