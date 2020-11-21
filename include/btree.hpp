@@ -36,6 +36,7 @@ class BTree {
   Status init();
   Status add(int64_t key, const Slice &value);
   Status read(int64_t key, std::string *value);
+  Status remove(int64_t key);
   Status destroy();
   page_id_t GetFirstLeafPage();
   std::vector<page_id_t> GetAllLeavesByPointer();

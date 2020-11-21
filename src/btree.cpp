@@ -33,6 +33,10 @@ Status BTree::read(int64_t key, std::string *value) {
   return root_->read(yedis_instance_->buffer_pool_manager, key, value);
 }
 
+Status BTree::remove(int64_t key) {
+  return root_->remove(yedis_instance_->buffer_pool_manager, key, &root_);
+}
+
 Status BTree::init() {
   // read meta
   page_id_t meta_page_id;

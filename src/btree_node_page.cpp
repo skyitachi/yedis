@@ -890,11 +890,42 @@ Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_
   auto parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent_id));
   auto key_pos = std::lower_bound(parent->KeyPosStart(), parent->KeyPosStart() + parent->GetCurrentEntries(), key);
   auto child_index = key_pos - parent->KeyPosStart();
+
+  // NOTE: make prev and next works
+  auto next_page_id = GetNextPageID();
+  if (next_page_id != INVALID_PAGE_ID) {
+    auto next_leaf_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(next_page_id));
+    next_leaf_page->SetPrevPageID(GetPrevPageID());
+  }
+  auto prev_page_id = GetPrevPageID();
+  if (prev_page_id != INVALID_PAGE_ID) {
+    auto prev_leaf_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(prev_page_id));
+    prev_leaf_page->SetPrevPageID(GetNextPageID());
+  }
+
   return parent->index_remove(buffer_pool_manager, child_index, root);
 }
 
 // NOTE：这里的逻辑最复杂
 Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int child_idx, BTreeNodePage** root) {
+  auto degree = GetDegree();
+  auto entries = GetCurrentEntries();
+  auto key_start = KeyPosStart();
+  auto child_start = ChildPosStart();
+  // index_node entries >= ceil(degree / 2)
+  if (entries - 1 >= (degree / 2)) {
+    SPDLOG_INFO("index_page {} has {} child, no_redistribute", GetPageID(), entries);
+    // direct remove child
+    if (child_idx != entries) {
+      // if last child, just update entries count
+      auto key_move_cnt = entries - child_idx - 1;
+      memmove(key_start + child_idx, key_start + child_idx + 1, key_move_cnt * sizeof(int64_t));
+      auto child_move_cnt = entries - child_idx;
+      memmove(child_start + child_idx, child_start + child_idx + 1, child_move_cnt * sizeof(page_id_t));
+    }
+    SetCurrentEntries(entries - 1);
+    return Status::OK();
+  }
   return Status::NotSupported();
 }
 
