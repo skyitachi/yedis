@@ -843,7 +843,7 @@ Status BTreeNodePage::remove(BufferPoolManager* buffer_pool_manager, int64_t key
     }
   }
   assert(it->IsLeafNode());
-  return leaf_remove(buffer_pool_manager, key, root);
+  return it->leaf_remove(buffer_pool_manager, key, root);
 }
 
 Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root) {
@@ -886,7 +886,8 @@ Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_
   // empty leaf_page, will cause parent to remove child
   auto parent_id = GetParentPageID();
   assert(parent_id != INVALID_PAGE_ID);
-  
+
+  SPDLOG_INFO("remove_page found parent id {}", parent_id);
   auto parent = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent_id));
   auto key_pos = std::lower_bound(parent->KeyPosStart(), parent->KeyPosStart() + parent->GetCurrentEntries(), key);
   auto child_index = key_pos - parent->KeyPosStart();
@@ -912,8 +913,25 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
   auto entries = GetCurrentEntries();
   auto key_start = KeyPosStart();
   auto child_start = ChildPosStart();
+  assert(entries >= 1);
   // index_node entries >= ceil(degree / 2)
-  if (entries - 1 >= (degree / 2)) {
+  if (entries - 1 >= (degree / 2) || *root == this) {
+    if (*root == this && entries == 1) {
+      // NOTE: 特殊情况
+      auto new_root_page_id = GetChild(0);
+      if (child_idx == 0) {
+        new_root_page_id = GetChild(1);
+      }
+      auto new_root_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(new_root_page_id));
+      auto old_root = *root;
+      assert(old_root != nullptr);
+      // NOTE: remove
+      buffer_pool_manager->UnPin(old_root);
+      old_root->ResetMemory();
+      *root = new_root_page;
+      return Status::OK();
+    }
+    // NOTE: only root can have less than degree / 2
     SPDLOG_INFO("index_page {} has {} child, no_redistribute", GetPageID(), entries);
     // direct remove child
     if (child_idx != entries) {

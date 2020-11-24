@@ -34,7 +34,18 @@ Status BTree::read(int64_t key, std::string *value) {
 }
 
 Status BTree::remove(int64_t key) {
-  return root_->remove(yedis_instance_->buffer_pool_manager, key, &root_);
+  auto origin_root = root_;
+  auto s = root_->remove(yedis_instance_->buffer_pool_manager, key, &root_);
+  if (!s.ok()) {
+    return s;
+  }
+  if (origin_root != root_) {
+    // 更新root page
+    meta_->SetRootPageId(root_->GetPageID());
+    yedis_instance_->buffer_pool_manager->Pin(root_);
+    SPDLOG_INFO("update meta info successfully, new root_page_id: {}", root_->GetPageID());
+  }
+  return s;
 }
 
 Status BTree::init() {

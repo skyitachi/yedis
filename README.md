@@ -43,4 +43,5 @@ yet another rocksdb based redis, let's call it `yedis`
 10. [x] pass BTreeSmallPageTest.LeafNodePrevAndNextTest
 
 
-11. [ ] test
+11. [ ] remove 删除page的是如何和物理page_id做对应, 比如删除了page_id = 3的page，那么page_id=5的实际文件offset要往前移动
+12. [ ] index_remove test

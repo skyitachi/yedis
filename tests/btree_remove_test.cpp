@@ -103,7 +103,29 @@ TEST_F(BTreeRemoveTest, IndexRemoveSimpleTest) {
     std::string tmp;
     s = root->read(1, &tmp);
     ASSERT_TRUE(!s.ok());
+    s = root->remove(4);
+    ASSERT_TRUE(s.ok());
+    s = root->read(4, &tmp);
+    ASSERT_TRUE(!s.ok());
+    s = root->remove(2);
+    ASSERT_TRUE(s.ok());
+    s = root->read(2, &tmp);
+    ASSERT_TRUE(!s.ok());
+    s = root->remove(3);
+    ASSERT_TRUE(s.ok());
+    s = root->read(3, &tmp);
+    ASSERT_TRUE(!s.ok());
+
+    s = root->remove(6);
+    ASSERT_TRUE(s.ok());
+    s = root->read(6, &tmp);
+    ASSERT_TRUE(!s.ok());
+    s = root->read(5, &tmp);
+    ASSERT_TRUE(s.ok());
   }
+
+
+  Flush();
 }
 
 }
