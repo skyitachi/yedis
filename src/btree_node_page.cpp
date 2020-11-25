@@ -945,7 +945,7 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
     return Status::OK();
   } else {
     // need redistribute
-    // NOTE: 只需要向相邻兄弟结点借一次，父结点不会改变的场景
+    // NOTE: 只需要向相邻兄弟结点借一次，父结点不会改变的场景, borrow key from parent
     // recursive remove
     auto parent_id = GetParentPageID();
     assert(parent_id != INVALID_PAGE_ID);

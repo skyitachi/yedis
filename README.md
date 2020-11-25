@@ -47,3 +47,4 @@ yet another rocksdb based redis, let's call it `yedis`
 12. [ ] index_remove test
 
 ### 居然remove_test的一个case写了一次就过了 :)
+- 果然是有问题的

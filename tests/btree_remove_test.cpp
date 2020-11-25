@@ -144,6 +144,11 @@ TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
     auto s = root->add(keys[i], *v);
     ASSERT_TRUE(s.ok());
   }
+
+  std::ofstream graphFile;
+  graphFile.open("btree.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
   std::string tmp;
   {
     // first remove 3
@@ -153,6 +158,10 @@ TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
     ASSERT_FALSE(s.ok());
   }
 
+  std::ofstream deleted_file;
+  deleted_file.open("btree_remove.dot");
+  root->ToGraph(deleted_file);
+  deleted_file.close();
   Flush();
 }
 

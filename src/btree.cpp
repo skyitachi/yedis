@@ -8,7 +8,7 @@
 #include <btree_leaf_node_page.hpp>
 #include <btree_meta_page.hpp>
 #include <stack>
-
+#include <sstream>
 
 namespace yedis {
 
@@ -157,6 +157,55 @@ std::vector<page_id_t> BTree::GetAllLeavesByIterate() {
 BTreeNodePage* BTree::get_page(page_id_t page_id) {
   if (page_id == INVALID_PAGE_ID) { return nullptr;}
   return reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(page_id));
+}
+
+void BTree::ToGraph(std::ofstream &out) {
+  out << "digraph G {\n  concentrate=True;\n rankdir=TB;\n node [shape=record]\n";
+  std::stringstream ss;
+
+  auto ret = std::vector<page_id_t>();
+  std::stack<page_id_t> next;
+  next.push(meta_->GetRootPageId());
+  while(!next.empty()) {
+    auto cur_page_id = next.top();
+    next.pop();
+    auto it = get_page(cur_page_id);
+    auto entries = it->GetCurrentEntries();
+    out << it->GetPageID() << " [label=\"{page_id: " << it->GetPageID() << "| {";
+    auto child_start = it->ChildPosStart();
+    assert(entries > 0);
+    for (auto i = 0; i < entries; i++) {
+      if (i > 0) {
+        out << " | "<< it->GetKey(i);
+      } else {
+        out << it->GetKey(i);
+      }
+    }
+    out << "}| {";
+    for (auto i = 0; i <= entries; i++) {
+      if (i > 0) {
+        out << " | "<< it->GetChild(i);
+      } else {
+        out << it->GetChild(i);
+      }
+    }
+    out << "}}\"]\n";
+    auto first_child = get_page(child_start[0]);
+    if (first_child->IsLeafNode()) {
+      // TODO: 建造叶子结点
+      continue;
+    } else {
+      // index node, reverse push to next
+      for (auto i = entries; i >= 0; i--) {
+        ss << it->GetPageID() << "->" << child_start[i] << "\n";
+        next.push(child_start[i]);
+      }
+    }
+  }
+
+  out << ss.str();
+
+  out << "}\n";
 }
 
 }
