@@ -128,7 +128,7 @@ TEST_F(BTreeRemoveTest, IndexRemoveSimpleTest) {
   Flush();
 }
 
-TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
+TEST_F(BTreeRemoveTest, IndexRemoveRedistributeSimple) {
   Open("btree_index_remove_redistribute_test.idx", 128, 16);
 
   int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
@@ -160,6 +160,94 @@ TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
 
   std::ofstream deleted_file;
   deleted_file.open("btree_remove.dot");
+  root->ToGraph(deleted_file);
+  deleted_file.close();
+  Flush();
+}
+
+TEST_F(BTreeRemoveTest, IndexRemoveBorrowParent) {
+  Open("btree_remove_borrow_parent.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 11;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+  std::string tmp;
+  {
+    // first remove 2
+    auto s = root->remove(2);
+    ASSERT_TRUE(s.ok());
+    s = root->read(2, &tmp);
+    ASSERT_FALSE(s.ok());
+  }
+
+  std::ofstream deleted_file;
+  deleted_file.open("btree_borrow_parent.dot");
+  root->ToGraph(deleted_file);
+  deleted_file.close();
+  Flush();
+}
+
+TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
+  Open("btree_remove_redistribute.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 9;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_redis.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+  std::string tmp;
+//  {
+//    // first remove 3
+//    auto s = root->remove(3);
+//    ASSERT_TRUE(s.ok());
+//    s = root->read(3, &tmp);
+//    ASSERT_FALSE(s.ok());
+//  }
+//  {
+//    // first remove 2
+//    auto s = root->remove(2);
+//    ASSERT_TRUE(s.ok());
+//    s = root->read(2, &tmp);
+//    ASSERT_FALSE(s.ok());
+//  }
+  {
+    // first remove 1
+    auto s = root->remove(1);
+    ASSERT_TRUE(s.ok());
+    s = root->read(1, &tmp);
+    ASSERT_FALSE(s.ok());
+  }
+
+  std::ofstream deleted_file;
+  deleted_file.open("btree_remove_redis.dot");
   root->ToGraph(deleted_file);
   deleted_file.close();
   Flush();

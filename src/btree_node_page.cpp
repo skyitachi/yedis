@@ -904,19 +904,21 @@ Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_
     prev_leaf_page->SetPrevPageID(GetNextPageID());
   }
 
-  return parent->index_remove(buffer_pool_manager, child_index, root);
+  return parent->index_remove(buffer_pool_manager, child_index, child_index, root);
 }
 
 // NOTE：这里的逻辑最复杂
-Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int child_idx, BTreeNodePage** root) {
+Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int key_idx, int child_idx, BTreeNodePage** root) {
   auto degree = GetDegree();
   auto entries = GetCurrentEntries();
   auto key_start = KeyPosStart();
   auto child_start = ChildPosStart();
   assert(entries >= 1);
+  SPDLOG_INFO("page_id {} to remove key_idx = {}, child_idx = {}", GetPageID(), key_idx, child_idx);
   // index_node entries >= ceil(degree / 2)
   if (entries - 1 >= (degree / 2) || *root == this) {
     if (*root == this && entries == 1) {
+      SPDLOG_INFO("root will down to child");
       // NOTE: 特殊情况
       auto new_root_page_id = GetChild(0);
       if (child_idx == 0) {
@@ -932,15 +934,12 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
       return Status::OK();
     }
     // NOTE: only root can have less than degree / 2
-    SPDLOG_INFO("index_page {} has {} child, no_redistribute", GetPageID(), entries + 1);
-    // direct remove child
-    if (child_idx != entries) {
-      // if last child, just update entries count
-      auto key_move_cnt = entries - child_idx - 1;
-      memmove(key_start + child_idx, key_start + child_idx + 1, key_move_cnt * sizeof(int64_t));
-      auto child_move_cnt = entries - child_idx;
-      memmove(child_start + child_idx, child_start + child_idx + 1, child_move_cnt * sizeof(page_id_t));
-    }
+    // if last child, just update entries count
+    auto key_move_cnt = entries - key_idx - 1;
+    SPDLOG_INFO("index_page {} has {} child, no_redistribute, move key cnt: {}", GetPageID(), entries + 1, key_move_cnt);
+    memmove(key_start + key_idx, key_start + (key_idx + 1), key_move_cnt * sizeof(int64_t));
+    auto child_move_cnt = entries - child_idx;
+    memmove(child_start + child_idx, child_start + (child_idx + 1), child_move_cnt * sizeof(page_id_t));
     SetCurrentEntries(entries - 1);
     return Status::OK();
   } else {
@@ -952,6 +951,7 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
     SPDLOG_INFO("index_remove will cause redistribute, parent_page_id {}, current page_id {}", parent_id, GetPageID());
     auto parent_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent_id));
     int parent_child_idx;
+    bool need_borrow_parent = false;
     // found current page's index in parent page
     auto s = parent_page->find_child_index(GetPageID(), &parent_child_idx);
     SPDLOG_INFO("parent_child_idx = {}, child_idx = {}", parent_child_idx, child_idx);
@@ -961,7 +961,9 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
       // right most child no need to delete
       SPDLOG_INFO("delete to right most child {}", child_idx);
     } else {
-      memmove(key_start + child_idx, key_start + child_idx + 1, (entries - child_idx - 1) * sizeof(int64_t));
+      SPDLOG_INFO("delete key_idx {} need to borrow from parent", key_idx);
+      need_borrow_parent = true;
+      memmove(key_start + key_idx, key_start + key_idx + 1, (entries - key_idx - 1) * sizeof(int64_t));
       memmove(child_start + child_idx, child_start + child_idx + 1, (entries - child_idx) * sizeof(page_id_t));
     }
     if (parent_child_idx == 0) {
@@ -970,18 +972,30 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
       assert(next_sibling_page_id != 0 && next_sibling_page_id != INVALID_PAGE_ID);
       auto next_sibling_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(next_sibling_page_id));
       auto sibling_entries = next_sibling_page->GetCurrentEntries();
+      // NOTE: just remove a child
       if (need_merge(entries - 1, sibling_entries)) {
         SPDLOG_INFO("merge two page left {}, right {}", GetPageID(), next_sibling_page_id);
+        if (need_borrow_parent) {
+          // NOTE: borrow from parent's first key
+          SPDLOG_INFO("page_id {} borrow first key from parent {}, key: {}", GetPageID(), parent_page->GetPageID(), parent_page->GetKey(0));
+          key_start[entries - 1] = parent_page->GetKey(0);
+        }
         // merge two nodes
-        memmove(key_start + entries - 1, next_sibling_page->KeyPosStart(), sizeof(int64_t) * sibling_entries);
+        memmove(key_start + entries, next_sibling_page->KeyPosStart(), sizeof(int64_t) * sibling_entries);
         memmove(child_start + entries, next_sibling_page->ChildPosStart(), sizeof(page_id_t) * (sibling_entries + 1));
-        SetCurrentEntries(entries - 1 + sibling_entries);
+        SetCurrentEntries(entries + sibling_entries);
         // TODO: delete next_sibling_page
         next_sibling_page->ResetMemory();
-        return parent_page->index_remove(buffer_pool_manager, 1, root);
+        return parent_page->index_remove(buffer_pool_manager, 0, 1, root);
       } else {
-        // redistribute is ok
+        // redistribute is ok, no recursive
+        auto max_redistribute_cnt = sibling_entries - (MAX_DEGREE / 2);
+        assert(max_redistribute_cnt > 0);
         SPDLOG_INFO("redistribute children between {} and {} is ok", GetPageID(), next_sibling_page_id);
+        SetCurrentEntries(entries - 1);
+        s = redistribute(this, next_sibling_page, parent_page, 0);
+        assert(s.ok());
+        return Status::OK();
       }
 
     } else if (parent_child_idx == parent_page->GetCurrentEntries()) {
@@ -992,6 +1006,64 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int c
 
   }
   return Status::NotSupported();
+}
+
+// TODO: redistribute
+Status BTreeNodePage::redistribute(BTreeNodePage *left, BTreeNodePage *right, BTreeNodePage *parent, int key_idx) {
+  assert(left != nullptr && right != nullptr && parent != nullptr);
+  auto entries_left = left->GetCurrentEntries();
+  auto entries_right = right->GetCurrentEntries();
+  auto redistribute_cnt = get_redistribute_cnt(entries_left, entries_right);
+  SPDLOG_INFO("entry_left = {}, entry_right = {}, redistribute_cnt = {}", entries_left, entries_right, redistribute_cnt);
+  // append keys to left
+  auto left_key_start = left->KeyPosStart();
+  auto right_key_start = right->KeyPosStart();
+  auto after_redis_right_cnt = entries_right - redistribute_cnt;
+  auto replaced_key = right->GetKey(redistribute_cnt - 1);
+  // borrow parent's key_idx key
+  // NOTE: important
+  left_key_start[entries_left] = parent->GetKey(key_idx);
+  memmove(left_key_start + entries_left + 1, right_key_start, (redistribute_cnt - 1) * sizeof(int64_t));
+
+  // append children to left
+  auto left_child_start = left->ChildPosStart();
+  auto right_child_start = right->ChildPosStart();
+  memmove(left_child_start + entries_left + 1, right_child_start, redistribute_cnt * sizeof(page_id_t));
+
+  // move right page's data
+  memmove(right_key_start, right_key_start + redistribute_cnt, sizeof(int64_t) * after_redis_right_cnt);
+  memmove(right_child_start, right_child_start + redistribute_cnt, sizeof(page_id_t) * (after_redis_right_cnt + 1));
+
+  // replace key
+  parent->KeyPosStart()[key_idx] = replaced_key;
+  right->SetCurrentEntries(after_redis_right_cnt);
+  left->SetCurrentEntries(entries_left + redistribute_cnt);
+
+  return Status::OK();
+}
+
+void BTreeNodePage::debug_page(BTreeNodePage *page) {
+  printf("---------------------------------------\n");
+  printf("----------page_id: %2d-----------------\n", page->GetPageID());
+  printf("-----------entries: %2d----------------\n", page->GetCurrentEntries());
+  auto entries = page->GetCurrentEntries();
+  for (int i = 0; i < entries; i++) {
+    printf("   %d", page->GetKey(i));
+  }
+  printf("\n");
+  for (int i = 0; i <= entries; i++) {
+    printf("   %d", page->GetChild(i));
+  }
+  printf("\n----------------------------------------\n");
+  fflush(stdout);
+}
+
+// 计算重新分布，right node 可一分配的entries cnt，尽量保证数量相等
+int BTreeNodePage::get_redistribute_cnt(int entries_left, int entries_right) {
+  assert(entries_left <= entries_right);
+  int avg = entries_left + (entries_right - entries_left)  / 2;
+  assert(avg >= MAX_DEGREE / 2);
+  return entries_right - avg;
 }
 
 bool BTreeNodePage::need_merge(int entries_left, int entries_right) const {

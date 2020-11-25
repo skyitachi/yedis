@@ -150,7 +150,7 @@ namespace yedis {
 
     Status leaf_remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root);
     // index_page remove maybe recursive
-    Status index_remove(BufferPoolManager*, int child_idx, BTreeNodePage** root);
+    Status index_remove(BufferPoolManager*, int key_idx, int child_idx, BTreeNodePage** root);
 
     Status remove(BufferPoolManager* buffer_pool_manager, int64_t key, BTreeNodePage** root);
 
@@ -158,8 +158,12 @@ namespace yedis {
     Status find_child_index(int child_page_id, int* result);
 
     bool need_merge(int , int) const;
+    Status redistribute(BTreeNodePage *left, BTreeNodePage* right, BTreeNodePage *parent, int key_idx);
+    Status merge(BTreeNodePage*left, BTreeNodePage* right, BTreeNodePage* parent);
+    static int get_redistribute_cnt(int, int);
 
-    void debug_available(BufferPoolManager*); 
+    void debug_available(BufferPoolManager*);
+    void debug_page(BTreeNodePage* page);
     class EntryIterator {
      public:
       EntryIterator(char *ptr): data_(ptr) {}
