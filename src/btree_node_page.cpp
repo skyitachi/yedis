@@ -904,6 +904,9 @@ Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_
     prev_leaf_page->SetPrevPageID(GetNextPageID());
   }
 
+  if (child_index == parent->GetCurrentEntries()) {
+    return parent->index_remove(buffer_pool_manager, child_index - 1, child_index, root);
+  }
   return parent->index_remove(buffer_pool_manager, child_index, child_index, root);
 }
 
@@ -914,6 +917,8 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
   auto key_start = KeyPosStart();
   auto child_start = ChildPosStart();
   assert(entries >= 1);
+  assert(child_idx <= entries);
+  assert(key_idx < entries);
   SPDLOG_INFO("page_id {} to remove key_idx = {}, child_idx = {}", GetPageID(), key_idx, child_idx);
   // index_node entries >= ceil(degree / 2)
   if (entries - 1 >= (degree / 2) || *root == this) {
@@ -951,7 +956,6 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
     SPDLOG_INFO("index_remove will cause redistribute, parent_page_id {}, current page_id {}", parent_id, GetPageID());
     auto parent_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(parent_id));
     int parent_child_idx;
-    bool need_borrow_parent = false;
     // found current page's index in parent page
     auto s = parent_page->find_child_index(GetPageID(), &parent_child_idx);
     SPDLOG_INFO("parent_child_idx = {}, child_idx = {}", parent_child_idx, child_idx);
@@ -960,30 +964,26 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
     if (child_idx == entries) {
       // right most child no need to delete
       SPDLOG_INFO("delete to right most child {}", child_idx);
-    } else {
-      SPDLOG_INFO("delete key_idx {} need to borrow from parent", key_idx);
-      need_borrow_parent = true;
-      memmove(key_start + key_idx, key_start + key_idx + 1, (entries - key_idx - 1) * sizeof(int64_t));
-      memmove(child_start + child_idx, child_start + child_idx + 1, (entries - child_idx) * sizeof(page_id_t));
     }
+    SPDLOG_INFO("delete key_idx {} need to borrow from parent", key_idx);
+    // NOTE: assume key_idx always right
+    memmove(key_start + key_idx, key_start + key_idx + 1, (entries - key_idx - 1) * sizeof(int64_t));
+    memmove(child_start + child_idx, child_start + child_idx + 1, (entries - child_idx) * sizeof(page_id_t));
     if (parent_child_idx == 0) {
       // left_most child, need to merge right sibling
       auto next_sibling_page_id = parent_page->GetChild(1);
       assert(next_sibling_page_id != 0 && next_sibling_page_id != INVALID_PAGE_ID);
       auto next_sibling_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(next_sibling_page_id));
       auto sibling_entries = next_sibling_page->GetCurrentEntries();
-      // NOTE: just remove a child
       if (need_merge(entries - 1, sibling_entries)) {
+        // NOTE: just remove a child
         SPDLOG_INFO("merge two page left {}, right {}", GetPageID(), next_sibling_page_id);
-        if (need_borrow_parent) {
-          // NOTE: borrow from parent's first key
-          SPDLOG_INFO("page_id {} borrow first key from parent {}, key: {}", GetPageID(), parent_page->GetPageID(), parent_page->GetKey(0));
-          key_start[entries - 1] = parent_page->GetKey(0);
-        }
-        // merge two nodes
-        memmove(key_start + entries, next_sibling_page->KeyPosStart(), sizeof(int64_t) * sibling_entries);
-        memmove(child_start + entries, next_sibling_page->ChildPosStart(), sizeof(page_id_t) * (sibling_entries + 1));
-        SetCurrentEntries(entries + sibling_entries);
+        // NOTE: borrow from parent's first key
+        SPDLOG_INFO("page_id {} borrow first key from parent {}, key: {}", GetPageID(), parent_page->GetPageID(), parent_page->GetKey(0));
+        // NOTE: update entries count before merge
+        SetCurrentEntries(entries - 1);
+        s = merge(this, next_sibling_page, parent_page, 0);
+        assert(s.ok());
         // TODO: delete next_sibling_page
         next_sibling_page->ResetMemory();
         return parent_page->index_remove(buffer_pool_manager, 0, 1, root);
@@ -1008,7 +1008,19 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
   return Status::NotSupported();
 }
 
-// TODO: redistribute
+Status BTreeNodePage::merge(BTreeNodePage *left, BTreeNodePage *right, BTreeNodePage *parent, int borrowed_key_idx) {
+  assert(left != nullptr && right != nullptr && parent != nullptr);
+  auto entries = left->GetCurrentEntries();
+  auto left_key_start = left->KeyPosStart();
+  auto left_child_start = left->ChildPosStart();
+  auto right_entries = right->GetCurrentEntries();
+  left_key_start[entries] = parent->GetKey(borrowed_key_idx);
+  memmove(left_key_start + entries + 1, right->KeyPosStart(), sizeof(int64_t) * right_entries);
+  memmove(left_child_start + entries + 1, right->ChildPosStart(), sizeof(page_id_t) * (right_entries + 1));
+  left->SetCurrentEntries(entries + 1 + right_entries);
+  return Status::OK();
+}
+
 Status BTreeNodePage::redistribute(BTreeNodePage *left, BTreeNodePage *right, BTreeNodePage *parent, int key_idx) {
   assert(left != nullptr && right != nullptr && parent != nullptr);
   auto entries_left = left->GetCurrentEntries();

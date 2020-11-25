@@ -128,8 +128,8 @@ TEST_F(BTreeRemoveTest, IndexRemoveSimpleTest) {
   Flush();
 }
 
-TEST_F(BTreeRemoveTest, IndexRemoveRedistributeSimple) {
-  Open("btree_index_remove_redistribute_test.idx", 128, 16);
+TEST_F(BTreeRemoveTest, IndexRemoveBorrowRightMost) {
+  Open("btree_remove_borrow_right_most.idx", 128, 16);
 
   int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
   int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
@@ -159,7 +159,7 @@ TEST_F(BTreeRemoveTest, IndexRemoveRedistributeSimple) {
   }
 
   std::ofstream deleted_file;
-  deleted_file.open("btree_remove.dot");
+  deleted_file.open("btree_remove_borrow_right_most.dot");
   root->ToGraph(deleted_file);
   deleted_file.close();
   Flush();

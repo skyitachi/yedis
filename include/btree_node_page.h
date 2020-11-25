@@ -158,8 +158,8 @@ namespace yedis {
     Status find_child_index(int child_page_id, int* result);
 
     bool need_merge(int , int) const;
-    Status redistribute(BTreeNodePage *left, BTreeNodePage* right, BTreeNodePage *parent, int key_idx);
-    Status merge(BTreeNodePage*left, BTreeNodePage* right, BTreeNodePage* parent);
+    static Status redistribute(BTreeNodePage *left, BTreeNodePage* right, BTreeNodePage *parent, int key_idx);
+    static Status merge(BTreeNodePage*left, BTreeNodePage* right, BTreeNodePage* parent, int borrowed_key_idx);
     static int get_redistribute_cnt(int, int);
 
     void debug_available(BufferPoolManager*);
