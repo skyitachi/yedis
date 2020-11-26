@@ -57,7 +57,9 @@ namespace yedis {
     inline bool Pinned() const {
       return pinned_;
     }
-    inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, options_.page_size);}
+    inline void ResetMemory() {
+      memset(data_, 0, options_.page_size);
+    }
 
    protected:
     static constexpr size_t OFFSET_PAGE_START = 0;

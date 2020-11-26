@@ -253,6 +253,38 @@ TEST_F(BTreeRemoveTest, IndexRemoveRedistribute) {
   Flush();
 }
 
+TEST_F(BTreeRemoveTest, IndexRemoveRightMostBorrowParent) {
+  Open("btree_index_remove_test.idx", 128, 16);
+
+  int64_t keys[] ={1, 2, 3, 4, 5, 6, 7};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60};
+  int limit = 7;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    auto s = root->remove(7);
+    assert(s.ok());
+  }
+
+  {
+    auto s = root->remove(6);
+    assert(s.ok());
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_right_most_borrow_parent.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+//  Flush();
+}
 }
 
 int main(int argc, char **argv) {

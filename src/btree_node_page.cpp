@@ -923,12 +923,12 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
   // index_node entries >= ceil(degree / 2)
   if (entries - 1 >= (degree / 2) || *root == this) {
     if (*root == this && entries == 1) {
-      SPDLOG_INFO("root will down to child");
       // NOTE: 特殊情况
       auto new_root_page_id = GetChild(0);
       if (child_idx == 0) {
         new_root_page_id = GetChild(1);
       }
+      SPDLOG_INFO("root will down to child, new_root_page_id {}", new_root_page_id);
       auto new_root_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(new_root_page_id));
       auto old_root = *root;
       assert(old_root != nullptr);
@@ -1000,10 +1000,28 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
 
     } else if (parent_child_idx == parent_page->GetCurrentEntries()) {
       // right most child
+      SPDLOG_INFO("delete right most child page {} in parent {} idx {}", GetPageID(), parent_page->GetPageID(), parent_child_idx);
+      auto prev_sibling_page_id = parent_page->GetChild(parent_child_idx - 1);
+      assert(prev_sibling_page_id != 0 && prev_sibling_page_id != INVALID_PAGE_ID);
+      auto prev_sibling_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(prev_sibling_page_id));
+      auto sibling_entries = prev_sibling_page->GetCurrentEntries();
+      if (need_merge(sibling_entries, entries - 1)) {
+        SPDLOG_INFO("merge two page left {}, right {}", prev_sibling_page_id, GetPageID());
+        SetCurrentEntries(entries - 1);
+        s = merge(prev_sibling_page, this, parent_page, parent_child_idx - 1);
+        assert(s.ok());
+        // current page reset memory
+        ResetMemory();
+        return parent_page->index_remove(buffer_pool_manager, parent_child_idx - 1, parent_child_idx, root);
+      } else {
+        SPDLOG_INFO("redistribute children between {} and {} is ok", prev_sibling_page_id, GetPageID());
+        SetCurrentEntries(entries - 1);
+        // TODO: 应该是有问题的
+        return redistribute(prev_sibling_page, this, parent_page, parent_child_idx - 1);
+      }
     } else {
 
     }
-
   }
   return Status::NotSupported();
 }
@@ -1021,6 +1039,8 @@ Status BTreeNodePage::merge(BTreeNodePage *left, BTreeNodePage *right, BTreeNode
   return Status::OK();
 }
 
+// TODO: 足够通用吗
+// 要分方向的
 Status BTreeNodePage::redistribute(BTreeNodePage *left, BTreeNodePage *right, BTreeNodePage *parent, int key_idx) {
   assert(left != nullptr && right != nullptr && parent != nullptr);
   auto entries_left = left->GetCurrentEntries();
