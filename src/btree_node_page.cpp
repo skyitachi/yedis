@@ -1016,7 +1016,6 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
       } else {
         SPDLOG_INFO("redistribute children between {} and {} is ok", prev_sibling_page_id, GetPageID());
         SetCurrentEntries(entries - 1);
-        // TODO: 应该是有问题的
         return redistribute(prev_sibling_page, this, parent_page, parent_child_idx - 1);
       }
     } else {
@@ -1045,32 +1044,69 @@ Status BTreeNodePage::redistribute(BTreeNodePage *left, BTreeNodePage *right, BT
   assert(left != nullptr && right != nullptr && parent != nullptr);
   auto entries_left = left->GetCurrentEntries();
   auto entries_right = right->GetCurrentEntries();
-  auto redistribute_cnt = get_redistribute_cnt(entries_left, entries_right);
-  SPDLOG_INFO("entry_left = {}, entry_right = {}, redistribute_cnt = {}", entries_left, entries_right, redistribute_cnt);
-  // append keys to left
-  auto left_key_start = left->KeyPosStart();
-  auto right_key_start = right->KeyPosStart();
-  auto after_redis_right_cnt = entries_right - redistribute_cnt;
-  auto replaced_key = right->GetKey(redistribute_cnt - 1);
-  // borrow parent's key_idx key
-  // NOTE: important
-  left_key_start[entries_left] = parent->GetKey(key_idx);
-  memmove(left_key_start + entries_left + 1, right_key_start, (redistribute_cnt - 1) * sizeof(int64_t));
+  if (entries_left < entries_right) {
+    // case redistribute-2
+    auto redistribute_cnt = get_redistribute_cnt(entries_left, entries_right);
+    SPDLOG_INFO("entry_left = {}, entry_right = {}, redistribute_cnt = {}", entries_left, entries_right, redistribute_cnt);
+    // append keys to left
+    auto left_key_start = left->KeyPosStart();
+    auto right_key_start = right->KeyPosStart();
+    auto after_redis_right_cnt = entries_right - redistribute_cnt;
+    auto replaced_key = right->GetKey(redistribute_cnt - 1);
+    // borrow parent's key_idx key
+    // NOTE: important
+    left_key_start[entries_left] = parent->GetKey(key_idx);
+    memmove(left_key_start + entries_left + 1, right_key_start, (redistribute_cnt - 1) * sizeof(int64_t));
 
-  // append children to left
-  auto left_child_start = left->ChildPosStart();
-  auto right_child_start = right->ChildPosStart();
-  memmove(left_child_start + entries_left + 1, right_child_start, redistribute_cnt * sizeof(page_id_t));
+    // append children to left
+    auto left_child_start = left->ChildPosStart();
+    auto right_child_start = right->ChildPosStart();
+    memmove(left_child_start + entries_left + 1, right_child_start, redistribute_cnt * sizeof(page_id_t));
 
-  // move right page's data
-  memmove(right_key_start, right_key_start + redistribute_cnt, sizeof(int64_t) * after_redis_right_cnt);
-  memmove(right_child_start, right_child_start + redistribute_cnt, sizeof(page_id_t) * (after_redis_right_cnt + 1));
+    // move right page's data
+    memmove(right_key_start, right_key_start + redistribute_cnt, sizeof(int64_t) * after_redis_right_cnt);
+    memmove(right_child_start, right_child_start + redistribute_cnt, sizeof(page_id_t) * (after_redis_right_cnt + 1));
 
-  // replace key
-  parent->KeyPosStart()[key_idx] = replaced_key;
-  right->SetCurrentEntries(after_redis_right_cnt);
-  left->SetCurrentEntries(entries_left + redistribute_cnt);
+    // replace key
+    parent->KeyPosStart()[key_idx] = replaced_key;
+    right->SetCurrentEntries(after_redis_right_cnt);
+    left->SetCurrentEntries(entries_left + redistribute_cnt);
+  } else if (entries_right < entries_left) {
+    // case redistribute-2
+    auto redistribute_cnt = get_redistribute_cnt(entries_right, entries_left);
+    SPDLOG_INFO("move left to right, parent key_idx {}", key_idx);
+    SPDLOG_INFO("entry_left = {}, entry_right = {}, redistribute_cnt = {}", entries_left, entries_right, redistribute_cnt);
+    // left 满了，需要向right redistribute
+    auto left_key_start = left->KeyPosStart();
+    auto right_key_start = right->KeyPosStart();
+    auto after_redis_left_cnt = entries_left - redistribute_cnt;
+    auto replaced_key = left ->GetKey(after_redis_left_cnt);
+    // borrow parent's key_idx key
+    // NOTE: important
+    assert(redistribute_cnt >= 1);
+    right_key_start[redistribute_cnt - 1] = parent->GetKey(key_idx);
+    // 右结点腾出位置给左结点分配过来的结点
+    memmove(right_key_start + redistribute_cnt, right_key_start, entries_right * sizeof(int64_t));
 
+    // prepend children to right
+    auto left_child_start = left->ChildPosStart();
+    auto right_child_start = right->ChildPosStart();
+    // 需要搬离的第一个结点不要移动
+    memmove(right_key_start, left_key_start + after_redis_left_cnt + 1, (redistribute_cnt - 1) * sizeof(int64_t));
+
+    // move right page's data
+    // order matters
+    // first
+    memmove(right_child_start + redistribute_cnt, right_child_start, sizeof(page_id_t) * (entries_right + 1));
+    // second
+    memmove(right_child_start, left_child_start + after_redis_left_cnt + 1, redistribute_cnt * sizeof(page_id_t));
+
+    // replace key
+    parent->KeyPosStart()[key_idx] = replaced_key;
+    left->SetCurrentEntries(after_redis_left_cnt);
+    right->SetCurrentEntries(entries_right + redistribute_cnt);
+
+  }
   return Status::OK();
 }
 
@@ -1091,11 +1127,11 @@ void BTreeNodePage::debug_page(BTreeNodePage *page) {
 }
 
 // 计算重新分布，right node 可一分配的entries cnt，尽量保证数量相等
-int BTreeNodePage::get_redistribute_cnt(int entries_left, int entries_right) {
-  assert(entries_left <= entries_right);
-  int avg = entries_left + (entries_right - entries_left)  / 2;
+int BTreeNodePage::get_redistribute_cnt(int entries_small, int entries_big) {
+  assert(entries_small <= entries_big);
+  int avg = entries_small + (entries_big - entries_small)  / 2;
   assert(avg >= MAX_DEGREE / 2);
-  return entries_right - avg;
+  return entries_big - avg;
 }
 
 bool BTreeNodePage::need_merge(int entries_left, int entries_right) const {
@@ -1190,5 +1226,17 @@ void BTreeNodePage::debug_available(BufferPoolManager* buffer_pool) {
   }
 }
 
+bool BTreeNodePage::keys_equals(std::initializer_list<page_id_t> results) {
+  if (GetCurrentEntries() != results.size()) {
+    return false;
+  }
+  auto it = results.begin();
+  for (int i = 0; i < results.size() && it != results.end(); i++, it++) {
+    if (GetKey(i) != *it) {
+      return false;
+    }
+  }
+  return true;
+}
 }
 

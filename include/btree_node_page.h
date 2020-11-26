@@ -6,6 +6,7 @@
 #define YEDIS_INCLUDE_BTREE_NODE_PAGE_H_
 
 #include <spdlog/spdlog.h>
+#include <initializer_list>
 
 #include "page.hpp"
 #include "btree.hpp"
@@ -162,8 +163,10 @@ namespace yedis {
     static Status merge(BTreeNodePage*left, BTreeNodePage* right, BTreeNodePage* parent, int borrowed_key_idx);
     static int get_redistribute_cnt(int, int);
 
+    // test utils
     void debug_available(BufferPoolManager*);
     void debug_page(BTreeNodePage* page);
+    bool keys_equals(std::initializer_list<page_id_t> results);
     class EntryIterator {
      public:
       EntryIterator(char *ptr): data_(ptr) {}

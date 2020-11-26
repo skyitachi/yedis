@@ -42,8 +42,9 @@ class BTree {
   std::vector<page_id_t> GetAllLeavesByPointer();
   std::vector<page_id_t> GetAllLeavesByIterate();
   void ToGraph(std::ofstream& out);
- private:
   inline BTreeNodePage* get_page(page_id_t page_id);
+  page_id_t GetRoot();
+ private:
   BTreeMetaPage* meta_;
   BTreeLeafNodePage * leaf_root_;
   BTreeNodePage *root_;

@@ -285,6 +285,60 @@ TEST_F(BTreeRemoveTest, IndexRemoveRightMostBorrowParent) {
   graphFile.close();
 //  Flush();
 }
+
+TEST_F(BTreeRemoveTest, Redistribute2) {
+  Open("btree_redistribute_2.idx", 128, 16);
+
+  int64_t keys[] ={1, 2, 6, 7, 8, 9, 3, 4, 5};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 9;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_redistribute_2_inserted.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+
+  {
+    auto s = root->remove(9);
+    assert(s.ok());
+  }
+
+  auto expected_root_id = 9;
+  ASSERT_EQ(expected_root_id, root->GetRoot());
+  auto root_page = root->get_page(expected_root_id);
+  ASSERT_EQ(4, root_page->GetKey(0));
+
+  auto left_child_page = root->get_page(3);
+  ASSERT_TRUE(left_child_page->keys_equals({1, 2, 3}));
+
+  auto right_child_page = root->get_page(8);
+  ASSERT_TRUE(right_child_page->keys_equals({5 ,6, 7}));
+
+  std::ofstream graphFile;
+  graphFile.open("btree_after_redistribute_2_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+
+  {
+    auto s = root->remove(8);
+    assert(s.ok());
+  }
+
+//  Flush();
+}
+
 }
 
 int main(int argc, char **argv) {

@@ -1,0 +1,10 @@
+digraph G {
+  concentrate=True;
+ rankdir=TB;
+ node [shape=record]
+9 [label="{page_id: 9| {4}| {3 | 8}}"]
+3 [label="{page_id: 3| {1 | 2 | 3}| {1 | 2 | 10 | 11}}"]
+8 [label="{page_id: 8| {5 | 6 | 7}| {12 | 4 | 5 | 6}}"]
+9->8
+9->3
+}
