@@ -339,6 +339,42 @@ TEST_F(BTreeRemoveTest, Redistribute2) {
 //  Flush();
 }
 
+TEST_F(BTreeRemoveTest, IndexRemoveBranch3) {
+  Open("btree_index_remove_branch_3.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 11;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_branch_3.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+  {
+    // case redis-5
+    auto s = root->remove(6);
+    ASSERT_TRUE(s.ok());
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_index_remove_branch_3_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+//  Flush();
+}
+
 }
 
 int main(int argc, char **argv) {
