@@ -158,6 +158,7 @@ BTreeNodePage* BTree::get_page(page_id_t page_id) {
   if (page_id == INVALID_PAGE_ID) { return nullptr;}
   return reinterpret_cast<BTreeNodePage*>(yedis_instance_->buffer_pool_manager->FetchPage(page_id));
 }
+
 page_id_t BTree::GetRoot() {
   return root_->GetPageID();
 }

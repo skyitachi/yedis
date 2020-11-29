@@ -1030,38 +1030,44 @@ Status BTreeNodePage::index_remove(BufferPoolManager* buffer_pool_manager, int k
       SPDLOG_INFO("page_id {} meet with middle node prev_page {}, next_page {}", GetPageID(), prev_page_id, next_page_id);
 
       SetCurrentEntries(entries - 1);
-      if (!need_merge(prev_entries, entries)) {
+      // update to latest entries
+      entries -= 1;
+      if (can_redistribute(prev_entries, entries)) {
         if (prev_entries > next_entries) {
           // case redis-3
           // redistribute between left and current
+          SPDLOG_INFO("case redis-3");
           return redistribute(prev_page, this, parent_page, parent_child_idx - 1);
         } else {
           // case redis-4
           // redistribute between current and right
-          return redistribute(this, next_page, parent_page, parent_child_idx - 1);
+          SPDLOG_INFO("case redis-4");
+          return redistribute(this, next_page, parent_page, parent_child_idx);
         }
-      } else if (!need_merge(next_entries, entries)) {
+      } else if (can_redistribute(next_entries, entries)) {
         // case redis-5
         // redistribute between current and right
         SPDLOG_INFO("index_remove:branch:3 case redis-5");
-        return redistribute(this, next_page, parent_page, parent_child_idx - 1);
+        return redistribute(this, next_page, parent_page, parent_child_idx);
       } else if (prev_entries < next_entries) {
         // case merge-1
         // merge left and current
+        // NOTE: 都不可以redistribute的情况下，prev和next应该是一样多的key, 理论上讲这个case应该不存在
         s = merge(prev_page, this, parent_page, parent_child_idx - 1);
         assert(s.ok());
+        SPDLOG_INFO("case merge-1");
         return parent_page->index_remove(buffer_pool_manager, parent_child_idx - 1, parent_child_idx, root);
       } else {
         // case merge-2
         // merge current and right
-        s = merge(this, next_page, parent_page, parent_child_idx - 1);
+        s = merge(this, next_page, parent_page, parent_child_idx);
         assert(s.ok());
-        return parent_page->index_remove(buffer_pool_manager, parent_child_idx - 1, parent_child_idx, root);
+        SPDLOG_INFO("case merge-2");
+        return parent_page->index_remove(buffer_pool_manager, parent_child_idx, parent_child_idx + 1, root);
       }
     }
   }
   SPDLOG_INFO("meet with unsupported situation");
-  return Status::NotSupported();
 }
 
 Status BTreeNodePage::merge(BTreeNodePage *left, BTreeNodePage *right, BTreeNodePage *parent, int borrowed_key_idx) {
@@ -1178,6 +1184,15 @@ bool BTreeNodePage::need_merge(int entries_left, int entries_right) const {
   return entries_left + entries_right - min_entries < min_entries;
 }
 
+bool BTreeNodePage::can_redistribute(int entries_left, int entries_right) const {
+  if (entries_right + entries_left < (MAX_DEGREE / 2) * 2) {
+    return false;
+  }
+  auto max = std::max(entries_left, entries_right);
+  auto min = std::min(entries_left, entries_right);
+  return (max - min) > 1;
+}
+
 Status BTreeNodePage::find_child_index(int child_page_id, int *result) {
   assert(!IsLeafNode());
   auto entries = GetCurrentEntries();
@@ -1272,6 +1287,20 @@ bool BTreeNodePage::keys_equals(std::initializer_list<page_id_t> results) {
   auto it = results.begin();
   for (int i = 0; i < results.size() && it != results.end(); i++, it++) {
     if (GetKey(i) != *it) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool BTreeNodePage::child_equals(std::initializer_list<page_id_t> expected) {
+  assert(!IsLeafNode());
+  if (GetCurrentEntries() + 1 != expected.size()) {
+    return false;
+  }
+  auto it = expected.begin();
+  for (int i = 0; i < expected.size() && it != expected.end(); i++, it++) {
+    if (GetChild(i) != *it) {
       return false;
     }
   }
