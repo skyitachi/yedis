@@ -15,3 +15,6 @@ target_link_libraries(btree_small_pool_test yedis spdlog::spdlog gtest)
 
 add_executable(btree_remove_test btree_remove_test.cpp)
 target_link_libraries(btree_remove_test yedis spdlog::spdlog gtest)
+
+add_executable(rwlatch_test rwlatch_test.cpp)
+target_link_libraries(rwlatch_test spdlog::spdlog gtest)
