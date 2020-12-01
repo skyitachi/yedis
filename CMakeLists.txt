@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(yedis)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     include_directories(./include ~/lab/rocksdb/include deps/spdlog/include deps/gtest/googletest/include)

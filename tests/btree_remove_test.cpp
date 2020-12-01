@@ -52,6 +52,9 @@ class BTreeRemoveTest : public testing::Test {
   void TearDown() override {
   }
 
+  void Destroy() {
+    root->destroy();
+  }
  private:
   BufferPoolManager *buffer_pool_manager_;
   DiskManager *disk_manager_;
@@ -365,6 +368,23 @@ TEST_F(BTreeRemoveTest, IndexRemoveBranch3) {
     // case redis-5
     auto s = root->remove(6);
     ASSERT_TRUE(s.ok());
+
+    // assertions
+    auto root_page_id = 9;
+    ASSERT_EQ(root_page_id, root->GetRoot());
+    auto root_page = root->get_page(root_page_id);
+    ASSERT_TRUE(root_page->keys_equals({3, 8}));
+    ASSERT_TRUE(root_page->child_equals({3, 8, 13}));
+
+    auto child_page_left_id = 8;
+    auto child_page_left = root->get_page(child_page_left_id);
+    ASSERT_TRUE(child_page_left->keys_equals({4, 6, 7}));
+    ASSERT_TRUE(child_page_left->child_equals({5, 6, 10, 11}));
+
+    auto child_right_page_id = 13;
+    auto child_page_right = root->get_page(child_right_page_id);
+    ASSERT_TRUE(child_page_right->keys_equals({9, 10}));
+    ASSERT_TRUE(child_page_right->child_equals({12, 14, 15}));
   }
 
   std::ofstream graphFile;
@@ -373,6 +393,252 @@ TEST_F(BTreeRemoveTest, IndexRemoveBranch3) {
   graphFile.close();
 
 //  Flush();
+}
+TEST_F(BTreeRemoveTest, IndexRemoveBranch3_1) {
+  Open("btree_index_remove_branch_3_1.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 11;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_branch_3.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+  {
+    // case redis-5
+    auto s = root->remove(5);
+    ASSERT_TRUE(s.ok());
+
+    // assertions
+    auto root_page_id = 9;
+    ASSERT_EQ(root_page_id, root->GetRoot());
+    auto root_page = root->get_page(root_page_id);
+    ASSERT_TRUE(root_page->keys_equals({3, 8}));
+    ASSERT_TRUE(root_page->child_equals({3, 8, 13}));
+
+    auto child_page_left_id = 8;
+    auto child_page_left = root->get_page(child_page_left_id);
+    ASSERT_TRUE(child_page_left->keys_equals({4, 6, 7}));
+    ASSERT_TRUE(child_page_left->child_equals({5, 7, 10, 11}));
+
+    auto child_right_page_id = 13;
+    auto child_page_right = root->get_page(child_right_page_id);
+    ASSERT_TRUE(child_page_right->keys_equals({9, 10}));
+    ASSERT_TRUE(child_page_right->child_equals({12, 14, 15}));
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_index_remove_branch_3_5_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+//  Flush();
+}
+
+TEST_F(BTreeRemoveTest, IndexRemoveBranch3_2) {
+  Open("btree_index_remove_branch_3_2.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 11;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    SPDLOG_INFO("inserted key {}, v_len= {}", keys[i], lens[i]);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_branch_3.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+  {
+    // case redis-5
+    auto s = root->remove(4);
+    ASSERT_TRUE(s.ok());
+
+    // assertions
+    auto root_page_id = 9;
+    ASSERT_EQ(root_page_id, root->GetRoot());
+    auto root_page = root->get_page(root_page_id);
+    ASSERT_TRUE(root_page->keys_equals({3, 8}));
+    ASSERT_TRUE(root_page->child_equals({3, 8, 13}));
+
+    auto child_page_left_id = 8;
+    auto child_page_left = root->get_page(child_page_left_id);
+    ASSERT_TRUE(child_page_left->keys_equals({5, 6, 7}));
+    ASSERT_TRUE(child_page_left->child_equals({6, 7, 10, 11}));
+
+    auto child_right_page_id = 13;
+    auto child_page_right = root->get_page(child_right_page_id);
+    ASSERT_TRUE(child_page_right->keys_equals({9, 10}));
+    ASSERT_TRUE(child_page_right->child_equals({12, 14, 15}));
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_index_remove_branch_3_2_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+//  Flush();
+}
+TEST_F(BTreeRemoveTest, IndexRemoveBranch3_case_redis_3) {
+  Open("btree_index_remove_branch_3_case_redis_3.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 3, 4, 5};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 14;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_branch_3_case_redis_3.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+  {
+    // case redis-3
+    auto s = root->remove(7);
+    ASSERT_TRUE(s.ok());
+
+    // assertions
+    auto root_page_id = 9;
+    ASSERT_EQ(root_page_id, root->GetRoot());
+    auto root_page = root->get_page(root_page_id);
+    ASSERT_TRUE(root_page->keys_equals({4, 9}));
+    ASSERT_TRUE(root_page->child_equals({3, 8, 13}));
+//
+    auto child_page_left_id = 3;
+    auto child_page_left = root->get_page(child_page_left_id);
+    ASSERT_TRUE(child_page_left->keys_equals({1, 2, 3}));
+    ASSERT_TRUE(child_page_left->child_equals({1, 2, 16, 17}));
+
+    auto child_right_page_id = 8;
+    auto child_page_right = root->get_page(child_right_page_id);
+    ASSERT_TRUE(child_page_right->keys_equals({5, 6, 8}));
+    ASSERT_TRUE(child_page_right->child_equals({18, 4, 6, 7}));
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_index_remove_branch_3_case_redis_3_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+//  Flush();
+  Destroy();
+}
+
+TEST_F(BTreeRemoveTest, IndexRemoveBranch3_case_merge_2) {
+  Open("btree_index_remove_branch_3_case_merge_1.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 10;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    auto s = root->remove(9);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_branch_3_case_merge_2.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+  {
+    // case merge-1
+    auto s = root->remove(5);
+    ASSERT_TRUE(s.ok());
+
+    // assertions
+    auto root_page_id = 9;
+    ASSERT_EQ(root_page_id, root->GetRoot());
+    auto root_page = root->get_page(root_page_id);
+    ASSERT_TRUE(root_page->keys_equals({3}));
+    ASSERT_TRUE(root_page->child_equals({3, 8}));
+//
+    auto child_page_left_id = 8;
+    auto child_page_left = root->get_page(child_page_left_id);
+    ASSERT_TRUE(child_page_left->keys_equals({4, 6, 7, 8}));
+    ASSERT_TRUE(child_page_left->child_equals({5, 7, 10, 11, 14}));
+  }
+
+  std::ofstream graphFile;
+  graphFile.open("btree_index_remove_branch_3_case_merge_2_result.dot");
+  root->ToGraph(graphFile);
+  graphFile.close();
+
+//  Flush();
+  Destroy();
+}
+
+TEST_F(BTreeRemoveTest, IndexRemoveUltimate) {
+  Open("btree_index_remove_ultimate.idx", 128, 16);
+
+  int64_t keys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  int lens[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
+  int limit = 10;
+  std::vector<std::string*> values;
+
+  for (int i = 0; i < limit; i++) {
+    auto *v = new std::string();
+    test::RandomString(rnd, lens[i], v);
+    values.push_back(v);
+    auto s = root->add(keys[i], *v);
+    ASSERT_TRUE(s.ok());
+  }
+  {
+    std::ofstream graphFile;
+    graphFile.open("btree_index_remove_ultimate.dot");
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+
+  for (int i = 0; i < limit - 1; i++) {
+    auto s = root->remove(keys[i]);
+    assert(s.ok());
+    std::ofstream graphFile;
+    char buf[50];
+    sprintf(buf, "btree_index_remove_ultimate_%lld_result.dot", keys[i]);
+    graphFile.open(buf);
+    root->ToGraph(graphFile);
+    graphFile.close();
+  }
+
+//  Flush();
+  Destroy();
 }
 
 }
