@@ -26,6 +26,7 @@ target_sources(yedis
         ${SOURCE_FILES}
 )
 
-add_subdirectory(tests)
+
 add_subdirectory(deps/spdlog)
 add_subdirectory(deps/gtest)
+add_subdirectory(tests)
