@@ -16,7 +16,6 @@ namespace yedis {
 class BTreeNodePageTest : public testing::Test {
  protected:
   void SetUp() override {
-    SPDLOG_INFO("gtest setup");
     disk_manager_ = new DiskManager("btree_node_page_test.idx");
     yedis_instance_ = new YedisInstance();
     yedis_instance_->disk_manager = disk_manager_;

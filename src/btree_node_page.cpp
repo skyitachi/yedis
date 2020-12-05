@@ -6,7 +6,6 @@
 #include <btree_node_page.h>
 #include <buffer_pool_manager.hpp>
 
-
 namespace yedis {
 
 using BTreeNodeIter = BTreeNodePage::EntryIterator;
@@ -33,6 +32,7 @@ Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size
 // NOTE: only root node can add key
 Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root) {
   SPDLOG_INFO("[{}], root page_id {}, available={}", key, GetPageID(), GetAvailable());
+  assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvailable());
 
   if (buffer_pool_manager->PinnedSize() != 2) {
     // 不考虑并发的话，之后meta和root会被pin住
@@ -49,7 +49,6 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
     return Status::NotSupported(Status::SubCode::kNone);
   }
   assert(target_leaf_page->Pinned());
-  assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvailable());
 
   SPDLOG_INFO("key={}, search leaf page: {}, successfully, available={}", key, target_leaf_page->GetPageID(), target_leaf_page->GetAvailable());
   auto s = target_leaf_page->leaf_insert(key, value, v_len);
@@ -74,12 +73,11 @@ Status BTreeNodePage::read(int64_t key, std::string *result) {
   return Status::NotSupported();
 }
 
-// TODO: Pin Or UnPin
 Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, std::string *result) {
   auto it = this;
+  it->RLock();
   std::vector<page_id_t> path;
   while (!it->IsLeafNode()) {
-    path.push_back(it->GetPageID());
     int64_t* key_start = it->KeyPosStart();
     int n_keys = it->GetCurrentEntries();
     auto child_start = it->ChildPosStart();
@@ -87,16 +85,16 @@ Status BTreeNodePage::read(BufferPoolManager* buffer_pool_manager, int64_t key, 
     auto found = std::lower_bound(key_start, key_end, key);
     auto pos = found - key_start;
     assert(pos <= it->GetCurrentEntries());
+    auto parent = it;
     it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
+    it->RLock();
+    // UnLock Parent as soon as possible
+    parent->RUnLock();
   }
   assert(it->IsLeafNode());
-  path.push_back(it->GetPageID());
-  printf("[%lld] read search path: ---------------------\n", key);
-  for(auto p: path) {
-    printf(" %d", p);
-  }
-  printf("\n");
-  return it->leaf_search(key, result);
+  auto s = it->leaf_search(key, result);
+  it->RUnLock();
+  return s;
 }
 
 // 搜索改key对应的leaf node, 默认是从根结点向下搜索
@@ -133,44 +131,32 @@ BTreeNodePage * BTreeNodePage::search(BufferPoolManager* buffer_pool_manager, in
       }
     }
     // TODO: ignore duplicate key
-    int64_t* key_start = it->KeyPosStart();
-    int n_keys = it->GetCurrentEntries();
+    pos = it->lower_bound_index(key);
     auto child_start = it->ChildPosStart();
-    // 这里算的真有问题吗
-    int64_t* key_end = key_start + n_keys;
-    SPDLOG_INFO("[{}] page_id: {}, key: {}, n_keys: {}, degree: {}", key, it->GetPageID(), key, n_keys, it->GetDegree());
-    printf("---------------------------------\n");
-    for (int i = 0; i < n_keys; i++) {
-      printf("%lld ", key_start[i]);
-    }
-    printf("\n---------------------------------\n");
-    int64_t* result = std::lower_bound(key_start, key_end, key);
+    assert(child_start[pos] != 0);
     if (parent != nullptr && parent != *root && parent != it) {
       buffer_pool_manager->UnPin(parent);
     }
-    printf("result = %p, key_start = %p\n", result, key_start);
     // NOTE: 实时更新parent_id
+    // TODO: 这里不利于加锁
     if (parent != nullptr && parent != it) {
+      assert(parent->WLocked() && it->WLocked());
       it->SetParentPageID(parent->GetPageID());
     }
     parent = it;
-    if (result != key_end) {
-      // found
-      pos = result - key_start;
-      SPDLOG_INFO("key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
-      it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
-    } else {
-      // key 最大
-      pos = n_keys;
-      SPDLOG_INFO("biggest key: key={} found child pos: {}, child page_id: {}", key, pos, child_start[pos]);
-      assert(child_start[pos] != 0);
-      it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
+    it = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->FetchPage(child_start[pos]));
+    // NOTE: child lock first
+    it->WLock();
+    assert(parent->WLocked());
+    if (parent->safe_add() && it->safe_add()) {
+      parent->WUnLock();
     }
     // NOTE: make sure parent and leaf node is pinned
     buffer_pool_manager->Pin(it);
   }
   if (parent != nullptr) {
     // NOTE: make parent relation right
+    assert(parent->WLocked());
     it->SetParentPageID(parent->GetPageID());
   }
   if (it->leaf_exists(key)) {
@@ -688,10 +674,9 @@ bool BTreeNodePage::leaf_exists(int64_t target) {
   return false;
 }
 
-// TODO: make static method
 BTreeNodePage* BTreeNodePage::NewIndexPage(BufferPoolManager* buffer_pool_manager, int cnt, int64_t key, page_id_t left, page_id_t right) {
   page_id_t new_page_id;
-  auto next_page = static_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
+  auto next_page = reinterpret_cast<BTreeNodePage*>(buffer_pool_manager->NewPage(&new_page_id));
   assert(new_page_id != INVALID_PAGE_ID);
   // TODO: make sure
   init(next_page, MAX_DEGREE, cnt, new_page_id, false);

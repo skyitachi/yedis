@@ -37,13 +37,13 @@ class BufferPoolManager {
     auto ret = std::vector<page_id_t>();
     for (auto [page_id, _]: records_) {
       if (page_id != 0) {
-        SPDLOG_INFO("memory recorded page_id {}", page_id);
         ret.push_back(page_id);
       }
     }
     return ret;
   }
 
+  bool DeletePage(page_id_t);
   void FlushPage(Page* page);
   void Pin(page_id_t page_id);
   void Pin(Page* page);

@@ -18,3 +18,6 @@ target_link_libraries(btree_remove_test yedis spdlog gtest)
 
 add_executable(rwlatch_test rwlatch_test.cpp)
 target_link_libraries(rwlatch_test spdlog gtest)
+
+add_executable(concurrent_test btree_concurrent_test.cpp)
+target_link_libraries(concurrent_test yedis spdlog gtest)

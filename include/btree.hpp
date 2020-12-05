@@ -5,10 +5,12 @@
 #ifndef YEDIS_INCLUDE_BTREE_NODE_HPP_
 #define YEDIS_INCLUDE_BTREE_NODE_HPP_
 #include <string>
+
 #include "yedis.hpp"
 #include "config.hpp"
 #include "yedis_zset.hpp"
 #include "option.hpp"
+#include "reader_writer_latch.h"
 
 namespace yedis {
 
@@ -51,6 +53,7 @@ class BTree {
   std::string file_name_;
   YedisInstance* yedis_instance_;
   BTreeOptions options_;
+  ReaderWriterLatch global_latch_;
 };
 }
 #endif //YEDIS_INCLUDE_BTREE_NODE_HPP_

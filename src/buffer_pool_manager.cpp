@@ -37,7 +37,6 @@ BufferPoolManager::~BufferPoolManager() {
 }
 
 // lru fetch
-// TODO: pinned fetch
 Page* BufferPoolManager::FetchPage(page_id_t page_id) {
   Page *next_page = nullptr;
   // fetch from pinned records first
@@ -165,6 +164,20 @@ void BufferPoolManager::FlushPage(Page *page) {
     SPDLOG_INFO("no need to flush: {}", page->GetPageId());
   }
   page->ResetMemory();
+}
+
+// DeletePage 从using record中移除到free list
+bool BufferPoolManager::DeletePage(page_id_t page_id) {
+  if (pinned_records_.find(page_id) != pinned_records_.end()) {
+    return false;
+  }
+  auto lru_it = lru_records_.find(page_id);
+  if (lru_it != lru_records_.end()) {
+    using_list_.erase(lru_it->second);
+    free_list_.push_back(*lru_it->second);
+    lru_records_.erase(lru_it);
+  }
+  return true;
 }
 }
 

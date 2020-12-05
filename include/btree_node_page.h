@@ -124,6 +124,7 @@ namespace yedis {
     // interface
     Status add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root);
     Status add(BufferPoolManager* buffer_pool_manager, int64_t key, const byte *value, size_t v_len, BTreeNodePage** root);
+
     Status read(const byte *key, std::string *result);
     // 必须是root结点出发
     Status read(int64_t key, std::string* result);
@@ -131,14 +132,19 @@ namespace yedis {
     // 带分裂的搜索
     BTreeNodePage * search(BufferPoolManager* buffer_pool_manager, int64_t key, const byte* value, size_t v_len, BTreeNodePage** root);
 
+    // concurrency related
+    inline bool safe_add() {
+      assert(!IsLeafNode());
+      return GetCurrentEntries() < MAX_DEGREE;
+    };
+
 
 //    virtual void init(int degree, page_id_t page_id);
     void init(int degree, page_id_t page_id);
-    void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
+    static void init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf);
 
-    // TODO: 这里的degree不能为0
     // TODO: 静态方法
-    inline void leaf_init(BTreeNodePage* dst, int n, page_id_t page_id) {
+    static inline void leaf_init(BTreeNodePage* dst, int n, page_id_t page_id) {
       return init(dst, 0, n, page_id, true);
     }
     // insert kv pair to leaf node
@@ -184,7 +190,7 @@ namespace yedis {
       char *data_;
     };
     BTreeNodePage* NewLeafPage(BufferPoolManager*, int cnt, const EntryIterator& start, const EntryIterator& end);
-    BTreeNodePage* NewIndexPage(BufferPoolManager*, int cnt, int64_t key, page_id_t left,  page_id_t right);
+    static BTreeNodePage* NewIndexPage(BufferPoolManager*, int cnt, int64_t key, page_id_t left,  page_id_t right);
     BTreeNodePage* NewIndexPage(BufferPoolManager*, const std::vector<int64_t>& keys, const std::vector<page_id_t>& children);
     // 迁移start到末尾的key和child到新的index page上
     BTreeNodePage* NewIndexPageFrom(BufferPoolManager*, BTreeNodePage* src, int start);

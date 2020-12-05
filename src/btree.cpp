@@ -15,6 +15,9 @@ namespace yedis {
 Status BTree::add(int64_t key, const Slice& value) {
   Status s;
   auto origin_root = root_;
+  origin_root->WLock();
+  if (origin_root != root_) {
+  }
   s = root_->add(yedis_instance_->buffer_pool_manager, key, reinterpret_cast<const byte *>(value.data()), value.size(), &root_);
   if (!s.ok()) {
     return s;
@@ -30,13 +33,16 @@ Status BTree::add(int64_t key, const Slice& value) {
 }
 
 Status BTree::read(int64_t key, std::string *value) {
-  return root_->read(yedis_instance_->buffer_pool_manager, key, value);
+  auto s = root_->read(yedis_instance_->buffer_pool_manager, key, value);
+  return s;
 }
 
 Status BTree::remove(int64_t key) {
+  global_latch_.WLock();
   auto origin_root = root_;
   auto s = root_->remove(yedis_instance_->buffer_pool_manager, key, &root_);
   if (!s.ok()) {
+    global_latch_.WUnLock();
     return s;
   }
   if (origin_root != root_) {
@@ -47,6 +53,7 @@ Status BTree::remove(int64_t key) {
     yedis_instance_->buffer_pool_manager->Pin(root_);
     SPDLOG_INFO("update meta info successfully, new root_page_id: {}", root_->GetPageID());
   }
+  global_latch_.WUnLock();
   return s;
 }
 

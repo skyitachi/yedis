@@ -6,10 +6,11 @@
 #define YEDIS_INCLUDE_PAGE_HPP_
 #include <cstring>
 #include <iostream>
+
 #include "config.hpp"
 #include "util.hpp"
-
 #include "option.hpp"
+#include "reader_writer_latch.h"
 
 namespace yedis {
   class Page {
@@ -19,6 +20,7 @@ namespace yedis {
       ResetMemory();
     }
     Page(): Page(BTreeOptions{}) {}
+
     ~Page() {
       delete data_;
     };
@@ -60,6 +62,23 @@ namespace yedis {
     inline void ResetMemory() {
       memset(data_, 0, options_.page_size);
     }
+    inline void WLock() {
+      latch_.WLock();
+      w_locked_.store(true);
+    }
+    inline void WUnLock() {
+      w_locked_.store(false);
+      latch_.WUnLock();
+    }
+    inline void RLock() {
+      latch_.RLock();
+    }
+    inline void RUnLock() {
+      latch_.RUnLock();
+    }
+    inline bool WLocked() {
+      return w_locked_.load();
+    }
 
    protected:
     static constexpr size_t OFFSET_PAGE_START = 0;
@@ -71,6 +90,8 @@ namespace yedis {
     char *data_;
     bool is_dirty_ = false;
     bool pinned_ = false;
+    std::atomic<bool> w_locked_;
+    ReaderWriterLatch latch_;
   };
 }
 #endif //YEDIS_INCLUDE_PAGE_HPP_
