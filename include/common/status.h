@@ -4,11 +4,9 @@
 
 #ifndef YEDIS_STATUS_H
 #define YEDIS_STATUS_H
-#include <string_view>
+#include <slice.h>
 
 namespace yedis {
-  using Slice = std::string_view;
-
   class Status {
       public:
       // Create a success status.
@@ -39,6 +37,9 @@ namespace yedis {
       }
       static Status IOError(const Slice& msg, const Slice& msg2 = Slice()) {
         return Status(kIOError, msg, msg2);
+      }
+      static Status NoSpace(const Slice& msg = Slice()) {
+        return Status(kIOError, "no space", msg);
       }
 
       // Returns true iff the status indicates success.

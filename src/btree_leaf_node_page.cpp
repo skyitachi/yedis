@@ -2,10 +2,11 @@
 // Created by skyitachi on 2020/8/25.
 //
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/bin_to_hex.h>
 
 #include "btree_leaf_node_page.hpp"
 
-#include <spdlog/fmt/bin_to_hex.h>
+
 namespace yedis {
 
 Status BTreeLeafNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len) {

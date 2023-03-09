@@ -4,13 +4,16 @@
 
 #include <yedis_zset.hpp>
 #include <spdlog/spdlog.h>
+#include <write_batch.h>
+#include <options.h>
+#include <db.h>
 
 namespace yedis {
 
 Status ZSet::zadd(const Slice &key, const std::vector<ScoreMember> &member) {
   const std::string key_str = key.ToString();
   std::string meta_key = kMetaKey + key_str;
-  rocksdb::WriteBatch batch;
+  WriteBatch batch;
   std::lock_guard<std::mutex> lock(mutex_);
   // fetch meta data need transaction or mutex
   std::string value;
@@ -32,7 +35,7 @@ Status ZSet::zadd(const Slice &key, const std::vector<ScoreMember> &member) {
     std::string value_key = key_str;
     PutFixed32(&value_key, score_member.score);
     value_key.append(score_member.member);
-    batch.Put(value_key, rocksdb::Slice());
+    batch.Put(value_key, Slice());
 
     std::string index_key = kIndexKeyPrefix + key_str;
     PutFixed32(&index_key, count);
@@ -43,14 +46,15 @@ Status ZSet::zadd(const Slice &key, const std::vector<ScoreMember> &member) {
   }
   return db_->Write(default_write_options_, &batch);
 }
+
 ZSet::StrList ZSet::zrange(const std::string& key, int start, int stop) {
   std::string index_key = kIndexKeyPrefix + key;
   PutFixed32(&index_key, start);
 
   // use iterator
-  rocksdb::ReadOptions read_options;
-  rocksdb::Slice lower_bound(index_key);
-  read_options.iterate_lower_bound = &lower_bound;
+  ReadOptions read_options;
+  Slice lower_bound(index_key);
+  read_options.iterate_lower_bound = lower_bound;
   auto it = db_->NewIterator(read_options);
   std::vector<std::string> ret;
   int count = 0;
@@ -65,6 +69,6 @@ ZSet::StrList ZSet::zrange(const std::string& key, int start, int stop) {
 }
 
 Status ZSet::zrem(const std::string &key, const StrList &members, int* removed) {
-  return Status::NotSupported();
+  return Status::NotSupported("not implement");
 }
 }

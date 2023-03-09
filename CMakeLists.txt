@@ -4,6 +4,13 @@ project(yedis)
 
 set(CMAKE_CXX_STANDARD 20)
 
+IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    include_directories(./include deps/spdlog/include deps/gtest/googletest/include)
+ELSE()
+    include_directories(./include deps/spdlog/include deps/gtest/googletest/include)
+ENDIF()
+
+
 option(BUILD_WITH_TESTS "Build Yedis's unit tests" ON)
 
 include_directories(include)

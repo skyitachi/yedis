@@ -2,7 +2,6 @@
 // Created by skyitachi on 2020/8/8.
 //
 
-#include <rocksdb/db.h>
 #include <iostream>
 #include <vector>
 #include <spdlog/spdlog.h>
