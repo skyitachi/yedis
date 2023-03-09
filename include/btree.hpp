@@ -9,10 +9,11 @@
 #include "config.hpp"
 #include "yedis_zset.hpp"
 #include "option.hpp"
+#include "common/status.h"
 
 namespace yedis {
 
-typedef uint8_t byte;
+  typedef uint8_t byte;
 struct Entry {
   // delete or normal
   byte flag;

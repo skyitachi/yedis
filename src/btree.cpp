@@ -9,9 +9,9 @@
 #include <btree_meta_page.hpp>
 #include <stack>
 #include <sstream>
+#include "common/status.h"
 
 namespace yedis {
-
 Status BTree::add(int64_t key, const Slice& value) {
   Status s;
   auto origin_root = root_;
