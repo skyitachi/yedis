@@ -4,7 +4,6 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <format>
 #include <absl/strings/substitute.h>
 
 #include "exception.h"
