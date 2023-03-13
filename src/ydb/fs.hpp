@@ -17,6 +17,7 @@ public:
   FileHandle(FileSystem& file_system, std::string path);
   FileHandle(const FileHandle&) = delete;
   virtual ~FileHandle();
+  virtual void Close() = 0;
   int64_t Read(void* buffer, int64_t nr_bytes);
   int64_t Write(void *buffer, int64_t nr_bytes);
 
@@ -39,6 +40,22 @@ class FileSystem {
   virtual int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes);
 
 
+};
+
+struct UnixFileHandle: public FileHandle {
+public:
+  UnixFileHandle(FileSystem& file_system, std::string path, int fd): FileHandle(file_system, std::move(path)), fd(fd) {}
+  ~UnixFileHandle() override {
+    Close();
+  }
+  int fd;
+public:
+  void Close() override {
+    if (fd != -1) {
+      close(fd);
+      fd = -1;
+    }
+  }
 };
 
 class LocalFileSystem: public FileSystem {

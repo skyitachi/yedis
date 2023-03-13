@@ -42,4 +42,50 @@ std::unique_ptr<FileHandle> LocalFileSystem::OpenFile(std::string_view path, uin
                                        path.data(), strerror(errno)));
   }
 }
+
+void LocalFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes, int64_t location) {
+  int fd =((UnixFileHandle&) handle).fd;
+  int64_t bytes_read = pread(fd, buffer, nr_bytes, location);
+  if (bytes_read == -1) {
+    throw IOException(absl::Substitute("Could not read from file $0: $1", handle.path, strerror(errno)));
+  }
+  if (bytes_read != nr_bytes) {
+    throw IOException(absl::Substitute("Could not read all bytes from file $0: wanted=$1 read=$2",
+                                       handle.path, nr_bytes, bytes_read));
+  }
+}
+
+int64_t LocalFileSystem::Read(FileHandle& handle, void *buffer, int64_t nr_bytes) {
+  int fd =((UnixFileHandle&) handle).fd;
+  int64_t bytes_read = read(fd, buffer, nr_bytes);
+  if (bytes_read == -1) {
+    throw IOException(absl::Substitute("Could not read from file $0: $1", handle.path, strerror(errno)));
+  }
+  return bytes_read;
+
+}
+
+void LocalFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes, int64_t location) {
+  int fd =((UnixFileHandle&) handle).fd;
+  int64_t bytes_written = pwrite(fd, buffer, nr_bytes, location);
+  if (bytes_written == -1) {
+    throw IOException(absl::Substitute("Could not write to file $0: $1", handle.path, strerror(errno)));
+  }
+  if (bytes_written != nr_bytes) {
+    throw IOException(absl::Substitute("Could not write all bytes to file $0: wanted=$1 read=$2",
+                                       handle.path, nr_bytes, bytes_written));
+
+  }
+}
+
+int64_t LocalFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes) {
+  int fd =((UnixFileHandle&) handle).fd;
+  int64_t bytes_written = write(fd, buffer, nr_bytes);
+  if (bytes_written == -1) {
+    throw IOException(absl::Substitute("Could not write to file $0: $1", handle.path, strerror(errno)));
+  }
+  return bytes_written;
+}
+
+
 }
