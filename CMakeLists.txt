@@ -19,7 +19,7 @@ aux_source_directory(src SOURCE_FILES)
 #add_executable(yedis ${SOURCE_FILES})
 #target_link_libraries(yedis rocksdb spdlog::spdlog gtest)
 
-add_library(yedis "" src/ydb/db_impl.cpp src/ydb/fs.hpp src/ydb/fs.cpp src/exception.cpp)
+add_library(yedis "" src/ydb/db_impl.cpp src/ydb/fs.hpp src/ydb/fs.cpp src/exception.cpp src/ydb/wal.cpp)
 
 target_sources(yedis
     PRIVATE
