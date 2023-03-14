@@ -11,11 +11,12 @@
 namespace yedis {
 class Slice;
 class FileHandle;
+class FileSystem;
 
 namespace wal {
   class Writer {
   public:
-    explicit Writer(FileHandle& handle);
+    explicit Writer(FileSystem& file_system, FileHandle& handle);
     Writer(const Writer&) = delete;
     Writer& operator=(const Writer&) = delete;
 
@@ -24,6 +25,7 @@ namespace wal {
     Status AddRecord(const Slice& slice);
     Status AddRecord(std::string_view slice);
   private:
+    FileSystem& file_system_;
     FileHandle& handle_;
     int block_offset_;
   };
