@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "common/status.h"
+#include "file_buffer.h"
 
 namespace yedis {
 class Slice;
@@ -16,7 +17,7 @@ class FileSystem;
 namespace wal {
   class Writer {
   public:
-    explicit Writer(FileSystem& file_system, FileHandle& handle);
+    explicit Writer(FileHandle& handle);
     Writer(const Writer&) = delete;
     Writer& operator=(const Writer&) = delete;
 
@@ -25,8 +26,8 @@ namespace wal {
     Status AddRecord(const Slice& slice);
     Status AddRecord(std::string_view slice);
   private:
-    FileSystem& file_system_;
     FileHandle& handle_;
+    std::unique_ptr<FileBuffer> file_buffer_;
     int block_offset_;
   };
 

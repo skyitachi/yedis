@@ -26,7 +26,7 @@ class Random {
   }
 
   // return random [0, max), except for max = 0
-  uint IntN(uint max) {
+  uint32_t IntN(uint32_t max) {
     if (max == 0) {
       return max;
     }

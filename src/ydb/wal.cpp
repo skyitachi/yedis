@@ -5,12 +5,15 @@
 #include "fs.hpp"
 #include "wal.h"
 #include "log_format.h"
-
+#include "allocator.h"
 
 namespace yedis {
 namespace wal {
-  Writer::Writer(FileSystem& file_system, FileHandle &handle):
-    file_system_(file_system), handle_(handle), block_offset_(0) {}
+  Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(0) {
+    Allocator& allocator = Allocator::DefaultAllocator();
+    file_buffer_ = std::make_unique<FileBuffer>(allocator, FileBufferType::BLOCK, kBlockSize);
+
+  }
   Writer::~Writer() {
     handle_.Close();
   }

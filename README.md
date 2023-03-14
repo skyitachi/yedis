@@ -47,3 +47,7 @@ yet another rocksdb based redis, let's call it `yedis`
 12. [ ] index_remove test
 13. [ ] remove the only one key case
 
+#### 依赖说明
+1. 依赖abseil
+2. 依赖https://github.com/google/crc32c/
+
