@@ -55,7 +55,7 @@ Status BTreeLeafNodePage::read(const byte *key, std::string *result) {
       return Status::OK();
     }
   }
-  return Status::NotFound();
+  return Status::NotFound("not found key", "");
 }
 
 void BTreeLeafNodePage::writeHeader() {

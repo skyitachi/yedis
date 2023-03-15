@@ -13,6 +13,7 @@
 #include "page.hpp"
 #include "yedis.hpp"
 #include "disk_manager.hpp"
+#include "common/status.h"
 
 #include "option.hpp"
 

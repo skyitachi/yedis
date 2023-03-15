@@ -5,7 +5,7 @@
 
 #include <btree_node_page.h>
 #include <buffer_pool_manager.hpp>
-
+#include "common/status.h"
 
 namespace yedis {
 
@@ -27,7 +27,7 @@ void BTreeNodePage::init(int degree, page_id_t page_id) {
 }
 
 Status BTreeNodePage::add(const byte *key, size_t k_len, const byte *value, size_t v_len, BTreeNodePage** root) {
-  return Status::NotSupported();
+  return Status::NotSupported("BTreeNodePage::add not supported");
 }
 
 // NOTE: only root node can add key
@@ -46,7 +46,7 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
   auto target_leaf_page = search(buffer_pool_manager, key, value, v_len, root);
   if (target_leaf_page == nullptr) {
     // NOTE: just for current design
-    return Status::NotSupported(Status::SubCode::kNone);
+    return Status::NotFound("no key");
   }
   assert(target_leaf_page->Pinned());
   assert(sizeof(int64_t) + sizeof(int32_t) + v_len <= MaxAvailable());
@@ -67,11 +67,11 @@ Status BTreeNodePage::add(BufferPoolManager* buffer_pool_manager, int64_t key, c
 }
 
 Status BTreeNodePage::read(const byte* key, std::string *result) {
-  return Status::NotSupported();
+  return Status::NotSupported("read not support");
 }
 
 Status BTreeNodePage::read(int64_t key, std::string *result) {
-  return Status::NotSupported();
+  return Status::NotSupported("read not support" );
 }
 
 // TODO: Pin Or UnPin
@@ -669,7 +669,7 @@ Status BTreeNodePage::leaf_search(int64_t target, std::string *dst) {
       return Status::OK();
     }
   }
-  return Status::NotFound();
+  return Status::NotFound("no key");
 }
 
 bool BTreeNodePage::leaf_exists(int64_t target) {
@@ -866,7 +866,7 @@ Status BTreeNodePage::leaf_remove(BufferPoolManager* buffer_pool_manager, int64_
   }
   if (!found) {
     SPDLOG_INFO("leaf {} not found key {}", GetPageID(), key);
-    return Status::NotFound();
+    return Status::NotFound("no key");
   }
   auto left = total - offset - total_size;
   if (left != 0) {
@@ -1161,7 +1161,7 @@ void BTreeNodePage::debug_page(BTreeNodePage *page) {
   printf("-----------entries: %2d----------------\n", page->GetCurrentEntries());
   auto entries = page->GetCurrentEntries();
   for (int i = 0; i < entries; i++) {
-    printf("   %d", page->GetKey(i));
+    printf("   %lld", page->GetKey(i));
   }
   printf("\n");
   for (int i = 0; i <= entries; i++) {
@@ -1203,7 +1203,7 @@ Status BTreeNodePage::find_child_index(int child_page_id, int *result) {
       return Status::OK();
     }
   }
-  return Status::NotFound();
+  return Status::NotFound("no key");
 }
 
 void BTreeNodePage::init(BTreeNodePage* dst, int degree, int n, page_id_t page_id, bool is_leaf) {

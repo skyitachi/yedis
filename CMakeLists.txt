@@ -4,6 +4,8 @@ project(yedis)
 
 set(CMAKE_CXX_STANDARD 20)
 
+add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION)
+
 IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     include_directories(./include deps/spdlog/include deps/gtest/googletest/include)
 ELSE()
@@ -16,10 +18,13 @@ option(BUILD_WITH_TESTS "Build Yedis's unit tests" ON)
 include_directories(include)
 
 aux_source_directory(src SOURCE_FILES)
+aux_source_directory(src/ydb SOURCE_FILES)
+
+message(STATUS "${SOURCE_FILES}"})
 #add_executable(yedis ${SOURCE_FILES})
 #target_link_libraries(yedis rocksdb spdlog::spdlog gtest)
 
-add_library(yedis "" src/ydb/db_impl.cpp src/ydb/fs.hpp src/ydb/fs.cpp src/exception.cpp src/ydb/wal.cpp)
+add_library(yedis "")
 
 target_sources(yedis
     PRIVATE

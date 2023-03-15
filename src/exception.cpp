@@ -104,4 +104,22 @@ const std::string &Exception::RawMessage() const {
   return raw_message_;
 }
 
+std::string Exception::GetStackTrace(int max_depth) {
+#ifdef YEDIS_DEBUG_STACKTRACE
+  std::string result;
+	auto callstack = std::unique_ptr<void *[]>(new void *[max_depth]);
+	int frames = backtrace(callstack.get(), max_depth);
+	char **strs = backtrace_symbols(callstack.get(), frames);
+	for (int i = 0; i < frames; i++) {
+		result += strs[i];
+		result += "\n";
+	}
+	free(strs);
+	return "\n" + result;
+#else
+  // Stack trace not available. Toggle DUCKDB_DEBUG_STACKTRACE in exception.cpp to enable stack traces.
+  return "";
+#endif
+}
+
 }

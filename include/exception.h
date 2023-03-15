@@ -71,6 +71,7 @@ public:
   const string &RawMessage() const;
 
   static string ExceptionTypeToString(ExceptionType type);
+  static string GetStackTrace(int max_depth = 120);
 
 
 private:

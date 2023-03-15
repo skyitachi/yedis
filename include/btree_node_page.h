@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 #include <initializer_list>
 
+#include <common/status.h>
 #include "page.hpp"
 #include "btree.hpp"
 

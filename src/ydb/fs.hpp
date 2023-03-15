@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <string_view>
+#include <unistd.h>
 
 namespace yedis {
 class FileSystem;
@@ -52,7 +53,7 @@ public:
 public:
   void Close() override {
     if (fd != -1) {
-      close(fd);
+      ::close(fd);
       fd = -1;
     }
   }

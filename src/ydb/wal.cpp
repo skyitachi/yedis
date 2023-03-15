@@ -7,8 +7,7 @@
 #include "log_format.h"
 #include "allocator.h"
 
-namespace yedis {
-namespace wal {
+namespace yedis::wal {
   Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(0) {
     Allocator& allocator = Allocator::DefaultAllocator();
     file_buffer_ = std::make_unique<FileBuffer>(allocator, FileBufferType::BLOCK, kBlockSize);
@@ -22,5 +21,4 @@ namespace wal {
 
 
   }
-}
 }
