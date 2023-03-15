@@ -5,6 +5,8 @@
 #ifndef YEDIS_SLICE_H
 #define YEDIS_SLICE_H
 #include <string>
+#include <cassert>
+#include <cstring>
 
 namespace yedis {
   class Slice {
