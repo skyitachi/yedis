@@ -1,3 +1,5 @@
+include_directories("${CMAKE_SOURCE_DIR}/src")
+
 add_executable(btree_node_page_test btree_node_page_test.cpp)
 target_link_libraries(btree_node_page_test yedis spdlog gtest)
 
@@ -21,3 +23,7 @@ target_link_libraries(rwlatch_test spdlog gtest)
 
 add_executable(allocator_test allocator_test.cpp)
 target_link_libraries(allocator_test yedis spdlog gtest)
+
+find_package(absl REQUIRED)
+add_executable(fs_test fs_test.cpp)
+target_link_libraries(fs_test yedis spdlog gtest absl::strings crc32c)

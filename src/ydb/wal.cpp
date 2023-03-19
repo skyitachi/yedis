@@ -18,7 +18,6 @@ namespace yedis::wal {
   }
 
   Status Writer::AddRecord(const Slice &slice) {
-
-
+    return Status::NotSupported("not implement");
   }
 }
