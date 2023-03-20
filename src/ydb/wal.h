@@ -26,6 +26,10 @@ namespace wal {
     Status AddRecord(const Slice& slice);
     Status AddRecord(std::string_view slice);
   private:
+    inline int available();
+    data_ptr_t data();
+    data_ptr_t header();
+    unsigned short size();
     FileHandle& handle_;
     std::unique_ptr<FileBuffer> file_buffer_;
     int block_offset_;

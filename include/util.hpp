@@ -48,6 +48,12 @@ inline void PutByte(std::string* dst, char value) {
   dst->append(buf, 1);
 }
 
+template<class T>
+inline void EncodeFixed(void* dst, T value) {
+  uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+  // little endian
+  std::memcpy(buffer, &value, sizeof(T));
+}
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

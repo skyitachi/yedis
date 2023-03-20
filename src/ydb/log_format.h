@@ -7,7 +7,7 @@
 
 namespace yedis {
 namespace wal {
-  enum class RecordType {
+  enum class RecordType:uint8_t {
     kZeroType = 0,
     kFullType = 1,
     kFirstType = 2,
@@ -19,7 +19,9 @@ namespace wal {
 
   static const int kBlockSize = 1 << 15;
 
-  static const int kHeaderSize = 4  + 2 + 1;
+  static const int kHeaderSize = 4 + 2 + 1;
+  static const int kTypeHeaderSize = 3;
+  static const int kBlockLenSize = 2;
 }
 }
 #endif //YEDIS_LOG_FORMAT_H
