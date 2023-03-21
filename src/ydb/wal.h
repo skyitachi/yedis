@@ -30,6 +30,7 @@ namespace wal {
     data_ptr_t data();
     data_ptr_t header();
     unsigned short size();
+    void reset_block_offset();
     FileHandle& handle_;
     std::unique_ptr<FileBuffer> file_buffer_;
     int block_offset_;

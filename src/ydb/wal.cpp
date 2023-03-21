@@ -9,7 +9,7 @@
 #include "util.hpp"
 
 namespace yedis::wal {
-  Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(kHeaderSize) {
+  Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(0) {
     Allocator& allocator = Allocator::DefaultAllocator();
     file_buffer_ = std::make_unique<FileBuffer>(allocator, FileBufferType::BLOCK, kBlockSize);
   }
@@ -18,46 +18,64 @@ namespace yedis::wal {
   }
 
   data_ptr_t Writer::data() {
-    return file_buffer_->buffer + kTypeHeaderSize;
+    return file_buffer_->buffer + block_offset_;
   }
 
-  data_ptr_t Writer::header() {
-    return file_buffer_->buffer;
-  }
   unsigned short Writer::size() {
-    return block_offset_ - kTypeHeaderSize;
+    return block_offset_;
   }
 
   int Writer::available() {
-    return file_buffer_->size - block_offset_;
+    return kBlockSize - block_offset_;
+  }
+
+  void Writer::reset_block_offset() {
+    block_offset_ = kHeaderSize;
   }
 
   Status Writer::AddRecord(const Slice &slice) {
     int64_t sz = slice.size();
     int written = 0;
-    bool is_begin = true;
+    bool begin = true;
+    RecordType t;
     while (sz > 0) {
       int left = available();
-      memcpy(data(), slice.data() + written, left);
-      block_offset_ += left;
-      written += left;
-      if(sz <= left) {
-        if (is_begin) {
-          is_begin = false;
-        }
-        EncodeFixed<unsigned short>(header(), size());
-        EncodeFixed<RecordType>(header() + kBlockLenSize, RecordType::kLastType);
-      } else if (sz > left) {
-        EncodeFixed<unsigned short>(header(), size());
-        if (is_begin) {
-          is_begin = false;
-          EncodeFixed<RecordType>(header() + kBlockLenSize, RecordType::kFirstType);
-        } else {
-          EncodeFixed<RecordType>(header() + kBlockLenSize, RecordType::kMiddleType);
-        }
+      bool end = sz <= left;
+      int64_t w = end ? sz : left;
+
+      if (available() <= kHeaderSize) {
+        // TODO: padding
+        reset_block_offset();
       }
-      sz -= left;
+
+      if (begin && end) {
+        t = RecordType::kFullType;
+      } else if (end) {
+        t = RecordType::kLastType;
+      } else if (begin) {
+        t = RecordType::kFirstType;
+      } else {
+        t = RecordType::kMiddleType;
+      }
+      memcpy(data() + kHeaderSize, slice.data() + written, w);
+      sz -= w;
+      written += w;
+      // TODO: encode crc32
+      EncodeFixed<uint16_t>(data(), w);
+      EncodeFixed<RecordType>(data() + kBlockLenSize, t);
+      block_offset_ += w + kHeaderSize;
+
+
+      // write to disk
+      file_buffer_->Append(handle_);
+
+
+      begin = false;
+
+      if (end) {
+        reset_block_offset();
+      }
     }
-    return Status::NotSupported("not implement");
+    return Status::OK();
   }
 }

@@ -25,7 +25,6 @@ public:
 public:
   void Write(FileHandle& handle, uint64_t location);
   void Append(FileHandle& handle);
-  virtual void ChecksumAndWrite(FileHandle& handle, uint64_t location);
   void Resize(uint64_t new_size);
 
   struct MemoryRequireMent {
@@ -35,8 +34,6 @@ public:
 
   MemoryRequireMent CalculateMemory(uint64_t user_size);
 protected:
-  data_ptr_t internal_buffer;
-  uint64_t internal_size;
   void Init();
   void ReallocBuffer(uint64_t malloc_size);
 
