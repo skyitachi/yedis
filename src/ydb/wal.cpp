@@ -35,46 +35,38 @@ namespace yedis::wal {
 
   Status Writer::AddRecord(const Slice &slice) {
     int64_t sz = slice.size();
-    int written = 0;
     bool begin = true;
+    int offset = 0;
     RecordType t;
-    while (sz > 0) {
+    while (offset < sz) {
       int left = available();
-      bool end = sz <= left;
-      int64_t w = end ? sz : left;
-
-      if (available() <= kHeaderSize) {
-        // TODO: padding
-        reset_block_offset();
+      bool end = false;
+      memcpy(data(), slice.data() + offset, left);
+      block_offset_ += left;
+      if (sz <= left) {
+        end = true;
       }
-
+      offset += left;
+      int leftover = kBlockSize - available();
+      if (leftover < kHeaderSize) {
+        // padding
+        memcpy(data() + left, Slice("\0\0\0\0\0\0\0", leftover).data(), leftover);
+      }
       if (begin && end) {
         t = RecordType::kFullType;
-      } else if (end) {
-        t = RecordType::kLastType;
       } else if (begin) {
         t = RecordType::kFirstType;
+      } else if (end) {
+        t = RecordType::kLastType;
       } else {
         t = RecordType::kMiddleType;
       }
-      memcpy(data() + kHeaderSize, slice.data() + written, w);
-      sz -= w;
-      written += w;
-      // TODO: encode crc32
-      EncodeFixed<uint16_t>(data(), w);
-      EncodeFixed<RecordType>(data() + kBlockLenSize, t);
-      block_offset_ += w + kHeaderSize;
-
-
-      // write to disk
+      EncodeFixed<uint16_t>(header(), left);
+      EncodeFixed<RecordType>(header() + kBlockLenSize, t);
       file_buffer_->Append(handle_);
 
-
       begin = false;
-
-      if (end) {
-        reset_block_offset();
-      }
+      block_offset_ = kHeaderSize;
     }
     return Status::OK();
   }
