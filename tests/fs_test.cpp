@@ -83,7 +83,18 @@ TEST(WALTest, Basic) {
   }
 
   auto read_file_handle = fs.OpenFile("wal.log", O_RDONLY);
-  wal::Reader reader(file_handle);
+  wal::Reader reader(*read_file_handle);
+
+  std::string data;
+  Slice dest;
+  int count = 0;
+  bool hasNext = true;
+  do {
+    count += 1;
+    hasNext = reader.ReadRecord(&dest, &data);
+    ASSERT_EQ(data.size(), sm_size);
+  } while (hasNext);
+  ASSERT_EQ(count, parts + 1);
 }
 
 TEST(WALTest, Padding) {

@@ -1,12 +1,16 @@
 //
 // Created by Shiping Yao on 2023/3/14.
 //
+#include <spdlog/spdlog.h>
+
 #include "common/status.h"
 #include "fs.hpp"
 #include "wal.h"
 #include "log_format.h"
 #include "allocator.h"
 #include "util.hpp"
+#include "common/checksum.h"
+#include "exception.h"
 
 namespace yedis::wal {
   Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(0) {
@@ -50,6 +54,7 @@ namespace yedis::wal {
         left = (sz - offset);
       }
       memcpy(data(), slice.data() + offset, left);
+      uint32_t checksum = Checksum(file_buffer_->buffer + block_offset_, left);
       offset += left;
       block_offset_ += left + kHeaderSize;
       int leftover = kBlockSize - size();
@@ -68,8 +73,10 @@ namespace yedis::wal {
       } else {
         t = RecordType::kMiddleType;
       }
-      EncodeFixed<uint16_t>(header(), left);
-      EncodeFixed<RecordType>(header() + kBlockLenSize, t);
+      EncodeFixed<uint32_t>(header(), checksum);
+      EncodeFixed<uint16_t>(header() + kCheckSumSize, left);
+      EncodeFixed<RecordType>(header() + kCheckSumSize + kBlockLenSize, t);
+
       file_buffer_->size = left + kHeaderSize;
       file_buffer_->Append(handle_);
       begin = false;
@@ -91,28 +98,37 @@ namespace yedis::wal {
   }
 
   bool Reader::ReadRecord(Slice *record, std::string *scratch) {
-    uint64_t size = kHeaderSize;
     char header_buf[kHeaderSize];
     RecordType t;
     int64_t sz;
+    int64_t size = 0;
     do {
-      t = DecodeFixed<RecordType>(header_buf + kCheckSumSize + sizeof(uint16_t));
-      scratch->reserve(size + kHeaderSize);
       sz = handle_.Read(header_buf, kHeaderSize, offset_);
       if (sz != kHeaderSize) {
         return false;
       }
-      scratch->append(header_buf);
-      uint16_t data_sz = DecodeFixed<uint16_t>(header_buf + kCheckSumSize);
-      size += kHeaderSize;
+      t = DecodeFixed<RecordType>(header_buf + kCheckSumSize + kBlockLenSize);
+      auto checksum = DecodeFixed<uint32_t>(header_buf);
+      auto data_sz = DecodeFixed<uint16_t>(header_buf + kCheckSumSize);
+      spdlog::info("data size: {}", data_sz);
       offset_ += kHeaderSize;
+      scratch->resize(size + data_sz);
       sz = handle_.Read(scratch->data() + size, data_sz, offset_);
       if (sz != data_sz) {
         return false;
       }
-      // TODO: verify checksum
+      auto compute = Checksum(reinterpret_cast<uint8_t*>(scratch->data()) + size, data_sz);
+      if (compute != checksum) {
+        spdlog::warn("checksum missmatch read: {}, compute: {}", checksum, compute);
+//        throw IOException("checksum miss match");
+      }
+      offset_ += data_sz;
+      size += data_sz;
     } while (t != RecordType::kLastType & t != RecordType::kFullType);
     *record = Slice(*scratch);
+    if (offset_ == handle_.FileSize()) {
+      return false;
+    }
     return true;
   }
 }
