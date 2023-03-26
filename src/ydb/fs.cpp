@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <absl/strings/substitute.h>
 
 #include "exception.h"
@@ -32,6 +33,15 @@ int64_t FileHandle::Read(void *buffer, int64_t nr_bytes, int64_t location) {
 
 int64_t FileHandle::Write(void *buffer, int64_t nr_bytes, int64_t location) {
   return file_system.Write(*this, buffer, nr_bytes, location);
+}
+
+int64_t UnixFileHandle::FileSize() {
+  struct stat st{};
+  int ret = fstat(fd, &st);
+  if (ret != 0) {
+    throw IOException("stats failed");
+  }
+  return st.st_size;
 }
 
 std::unique_ptr<FileHandle> LocalFileSystem::OpenFile(std::string_view path, int flags) {
@@ -86,6 +96,10 @@ int64_t LocalFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_byte
     throw IOException(absl::Substitute("Could not write to file $0: $1", handle.path, strerror(errno)));
   }
   return bytes_written;
+}
+
+int64_t LocalFileSystem::GetFileSize(FileHandle &handle) {
+  return handle.FileSize();
 }
 
 }

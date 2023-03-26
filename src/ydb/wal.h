@@ -36,6 +36,19 @@ namespace wal {
     int block_offset_;
   };
 
+  class Reader {
+  public:
+    explicit Reader(FileHandle& handle, uint64_t initial_offset = 0);
+    Reader(const Reader&) = delete;
+    Reader& operator=(const Reader&) = delete;
+
+    ~Reader();
+
+    bool ReadRecord(Slice* record, std::string *scratch);
+  private:
+    FileHandle& handle_;
+    uint64_t offset_;
+  };
 }
 }
 #endif //YEDIS_WAL_H

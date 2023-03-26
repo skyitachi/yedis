@@ -54,6 +54,12 @@ inline void EncodeFixed(void* dst, T value) {
   // little endian
   std::memcpy(buffer, &value, sizeof(T));
 }
+
+template<class T>
+inline T DecodeFixed(void *src) {
+  uint8_t* const buffer = reinterpret_cast<uint8_t*>(src);
+  return *reinterpret_cast<T *>(buffer);
+}
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

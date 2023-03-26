@@ -7,6 +7,7 @@
 #include <string>
 #include <cassert>
 #include <cstring>
+#include <string_view>
 
 namespace yedis {
   class Slice {
@@ -22,6 +23,7 @@ namespace yedis {
 
       // Create a slice that refers to s[0,strlen(s)-1]
       Slice(const char* s) : data_(s), size_(strlen(s)) {}
+      Slice(std::string_view s): data_(s.data()), size_(s.size()) {}
 
       // Intentionally copyable.
       Slice(const Slice&) = default;

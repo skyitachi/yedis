@@ -20,6 +20,7 @@ public:
   FileHandle(const FileHandle&) = delete;
   virtual ~FileHandle();
   virtual void Close() = 0;
+  virtual int64_t FileSize() = 0;
   int64_t Read(void* buffer, int64_t nr_bytes);
   int64_t Write(void *buffer, int64_t nr_bytes);
 
@@ -36,6 +37,7 @@ class FileSystem {
  public:
 //  static FileSystem& GetFileSystem(DB& db);
   virtual std::unique_ptr<FileHandle> OpenFile(std::string_view path, int flags) = 0;
+  virtual int64_t GetFileSize(FileHandle& handle) = 0;
   virtual int64_t Read(FileHandle& handle, void *buffer, int64_t nr_bytes, int64_t location) = 0;
   virtual int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes, int64_t location) = 0;
   virtual int64_t Read(FileHandle& handle, void *buffer, int64_t nr_bytes) = 0;
@@ -51,6 +53,7 @@ public:
     Close();
   }
   int fd;
+  int64_t FileSize() override;
 public:
   void Close() override {
     if (fd != -1) {
@@ -63,6 +66,8 @@ public:
 class LocalFileSystem: public FileSystem {
 public:
   std::unique_ptr<FileHandle> OpenFile(std::string_view path, int flags) override;
+
+  int64_t GetFileSize(FileHandle& handle) override;
 
   int64_t Read(FileHandle& handle, void *buffer, int64_t nr_bytes, int64_t location) override;
 

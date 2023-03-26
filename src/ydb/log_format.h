@@ -20,6 +20,7 @@ namespace wal {
   static const int kBlockSize = 1 << 15;
 
   static const int kHeaderSize = 4 + 2 + 1;
+  static const int kCheckSumSize = 4;
   static const int kTypeHeaderSize = 3;
   static const int kBlockLenSize = 2;
 }
