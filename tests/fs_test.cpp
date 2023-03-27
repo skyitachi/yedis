@@ -58,11 +58,11 @@ TEST(WALTest, Basic) {
   Random* rnd = new Random();
   int sm_size = 100;
   std::string small;
-  test::RandomString(rnd, sm_size, &small);
 
   int parts = wal::kBlockSize / (sm_size + wal::kHeaderSize);
 
   for (int i = 0; i < parts; i++) {
+    test::RandomString(rnd, sm_size, &small);
     auto s = log_writer.AddRecord(Slice(small));
     ASSERT_TRUE(s.ok());
   }
@@ -71,7 +71,6 @@ TEST(WALTest, Basic) {
   auto real_sz = parts * (sm_size + wal::kHeaderSize);
   ASSERT_EQ(f_sz, real_sz);
   spdlog::info("file_sz: {}", f_sz);
-
   {
     auto data = Slice(small);
     auto s = log_writer.AddRecord(data);
@@ -88,7 +87,7 @@ TEST(WALTest, Basic) {
   std::string data;
   Slice dest;
   int count = 0;
-  bool hasNext = true;
+  bool hasNext;
   do {
     count += 1;
     hasNext = reader.ReadRecord(&dest, &data);
@@ -97,19 +96,19 @@ TEST(WALTest, Basic) {
   ASSERT_EQ(count, parts + 1);
 }
 
-TEST(WALTest, Padding) {
+TEST(WALTest2, Padding) {
   LocalFileSystem fs;
   auto file_handle = fs.OpenFile("wal.log", O_APPEND | O_CREAT | O_RDWR | O_TRUNC);
   ASSERT_TRUE(file_handle);
   wal::Writer log_writer(*file_handle.get());
   Random* rnd = new Random();
   int sm_size = 32760;
-  std::string small;
-  test::RandomString(rnd, sm_size, &small);
 
   int parts = wal::kBlockSize / (sm_size + wal::kHeaderSize);
 
   for (int i = 0; i < parts; i++) {
+    std::string small;
+    test::RandomString(rnd, sm_size, &small);
     auto s = log_writer.AddRecord(Slice(small));
     ASSERT_TRUE(s.ok());
   }
@@ -118,20 +117,54 @@ TEST(WALTest, Padding) {
   auto real_sz = wal::kBlockSize;
   ASSERT_EQ(f_sz, real_sz);
   spdlog::info("file_sz: {}", f_sz);
+
+  auto read_file_handle = fs.OpenFile("wal.log", O_RDONLY);
+  wal::Reader reader(*read_file_handle);
+
+  std::string data;
+  Slice dest;
+  int count = 0;
+  bool hasNext;
+  do {
+    count += 1;
+    hasNext = reader.ReadRecord(&dest, &data);
+    ASSERT_EQ(data.size(), sm_size);
+  } while (hasNext);
+  ASSERT_EQ(count, parts);
 }
 
-TEST(WALTest, BigSlice) {
+TEST(WALTest3, BigSlice) {
   LocalFileSystem fs;
   auto file_handle = fs.OpenFile("wal.log", O_APPEND | O_CREAT | O_RDWR | O_TRUNC);
   ASSERT_TRUE(file_handle);
   wal::Writer log_writer(*file_handle.get());
   Random* rnd = new Random();
   int big_size = 32768 * 2;
-  std::string big;
-  test::RandomString(rnd, big_size, &big);
+  std::vector<int> sz_vecs = {100, 32768, 32768 * 2};
+  std::vector<std::string> vecs;
+  for (auto sz : sz_vecs) {
+    std::string value;
+    test::RandomString(rnd, sz, &value);
+    vecs.push_back(value);
+    auto s =log_writer.AddRecord(Slice(value));
+    ASSERT_TRUE(s.ok());
+  }
 
 
+  auto read_file_handle = fs.OpenFile("wal.log", O_RDONLY);
+  wal::Reader reader(*read_file_handle);
 
+  std::string data;
+  Slice dest;
+  int count = 0;
+  bool hasNext;
+  do {
+    hasNext = reader.ReadRecord(&dest, &data);
+    ASSERT_EQ(data.size(), sz_vecs[count]);
+    ASSERT_EQ(data, vecs[count]);
+    count += 1;
+  } while (hasNext);
+  ASSERT_EQ(count, vecs.size());
 }
 
 int main(int argc, char **argv) {

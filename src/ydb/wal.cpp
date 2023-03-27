@@ -22,7 +22,7 @@ namespace yedis::wal {
   }
 
   data_ptr_t Writer::data() {
-    return file_buffer_->buffer + block_offset_;
+    return file_buffer_->buffer + kHeaderSize;
   }
 
   data_ptr_t Writer::header() {
@@ -54,7 +54,10 @@ namespace yedis::wal {
         left = (sz - offset);
       }
       memcpy(data(), slice.data() + offset, left);
-      uint32_t checksum = Checksum(file_buffer_->buffer + block_offset_, left);
+      uint32_t checksum = Checksum(data(), left);
+      EncodeFixed<uint32_t>(header(), checksum);
+      EncodeFixed<uint16_t>(header() + kCheckSumSize, left);
+
       offset += left;
       block_offset_ += left + kHeaderSize;
       int leftover = kBlockSize - size();
@@ -73,8 +76,6 @@ namespace yedis::wal {
       } else {
         t = RecordType::kMiddleType;
       }
-      EncodeFixed<uint32_t>(header(), checksum);
-      EncodeFixed<uint16_t>(header() + kCheckSumSize, left);
       EncodeFixed<RecordType>(header() + kCheckSumSize + kBlockLenSize, t);
 
       file_buffer_->size = left + kHeaderSize;
@@ -110,20 +111,26 @@ namespace yedis::wal {
       t = DecodeFixed<RecordType>(header_buf + kCheckSumSize + kBlockLenSize);
       auto checksum = DecodeFixed<uint32_t>(header_buf);
       auto data_sz = DecodeFixed<uint16_t>(header_buf + kCheckSumSize);
-      spdlog::info("data size: {}", data_sz);
       offset_ += kHeaderSize;
+
       scratch->resize(size + data_sz);
       sz = handle_.Read(scratch->data() + size, data_sz, offset_);
       if (sz != data_sz) {
         return false;
       }
       auto compute = Checksum(reinterpret_cast<uint8_t*>(scratch->data()) + size, data_sz);
+//      spdlog::info("record_type: {}", t);
       if (compute != checksum) {
-        spdlog::warn("checksum missmatch read: {}, compute: {}", checksum, compute);
-//        throw IOException("checksum miss match");
+        spdlog::info("read mismatch checksum read: {}, compute: {} data_sz: {}", checksum, compute, data_sz);
+        throw IOException("checksum miss match");
       }
       offset_ += data_sz;
       size += data_sz;
+
+      int leftover = kBlockSize - offset_ % kBlockSize;
+      if (leftover <= kHeaderSize) {
+        offset_ += leftover;
+      }
     } while (t != RecordType::kLastType & t != RecordType::kFullType);
     *record = Slice(*scratch);
     if (offset_ == handle_.FileSize()) {
