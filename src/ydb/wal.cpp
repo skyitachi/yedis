@@ -2,6 +2,7 @@
 // Created by Shiping Yao on 2023/3/14.
 //
 #include <spdlog/spdlog.h>
+#include <crc32c/crc32c.h>
 
 #include "common/status.h"
 #include "fs.hpp"
@@ -12,10 +13,20 @@
 #include "common/checksum.h"
 #include "exception.h"
 
+
 namespace yedis::wal {
+
+  static void InitTypeCrc(uint32_t* type_crc) {
+    for (int i = 0; i <= kMaxRecordType; i++) {
+      char t = static_cast<char>(i);
+      type_crc[i] = crc32::Value(reinterpret_cast<uint8_t*>(&t), 1);
+    }
+  }
+
   Writer::Writer(FileHandle &handle): handle_(handle), block_offset_(0) {
     Allocator& allocator = Allocator::DefaultAllocator();
     file_buffer_ = std::make_unique<FileBuffer>(allocator, FileBufferType::BLOCK, kBlockSize);
+    InitTypeCrc(type_crc_);
   }
   Writer::~Writer() {
     handle_.Close();
@@ -48,14 +59,14 @@ namespace yedis::wal {
     RecordType t;
     while (offset < sz) {
       int left = available();
+      int fragment_length = left;
       bool end = false;
       if ((sz - offset) <= left) {
         end = true;
         left = (sz - offset);
+        fragment_length = left;
       }
       memcpy(data(), slice.data() + offset, left);
-      uint32_t checksum = Checksum(data(), left);
-      EncodeFixed<uint32_t>(header(), checksum);
       EncodeFixed<uint16_t>(header() + kCheckSumSize, left);
 
       offset += left;
@@ -76,6 +87,9 @@ namespace yedis::wal {
       } else {
         t = RecordType::kMiddleType;
       }
+      uint32_t checksum = crc32::Extend(type_crc_[uint8_t(t)], data(), fragment_length);
+      checksum = crc32::Mask(checksum);
+      EncodeFixed<uint32_t>(header(), checksum);
       EncodeFixed<RecordType>(header() + kCheckSumSize + kBlockLenSize, t);
 
       file_buffer_->size = left + kHeaderSize;
@@ -92,7 +106,9 @@ namespace yedis::wal {
     return AddRecord(Slice(sv));
   }
 
-  Reader::Reader(FileHandle &handle, uint64_t initial_offset): handle_(handle), offset_(initial_offset) {}
+  Reader::Reader(FileHandle &handle, uint64_t initial_offset): handle_(handle), offset_(initial_offset) {
+    InitTypeCrc(type_crc_);
+  }
 
   Reader::~Reader() {
     handle_.Close();
@@ -118,8 +134,8 @@ namespace yedis::wal {
       if (sz != data_sz) {
         return false;
       }
-      auto compute = Checksum(reinterpret_cast<uint8_t*>(scratch->data()) + size, data_sz);
-//      spdlog::info("record_type: {}", t);
+      auto compute = crc32::Extend(type_crc_[uint8_t(t)], reinterpret_cast<uint8_t*>(scratch->data()) + size, data_sz);
+      compute = crc32::Mask(compute);
       if (compute != checksum) {
         spdlog::info("read mismatch checksum read: {}, compute: {} data_sz: {}", checksum, compute, data_sz);
         throw IOException("checksum miss match");

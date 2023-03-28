@@ -167,6 +167,22 @@ TEST(WALTest3, BigSlice) {
   ASSERT_EQ(count, vecs.size());
 }
 
+
+TEST(WALTEST4, ByGoLeveldb) {
+  LocalFileSystem fs;
+  auto read_file_handle =  fs.OpenFile("demo/000001.log", O_RDONLY);
+  wal::Reader reader(*read_file_handle);
+  std::string data;
+  Slice dest;
+  int count = 0;
+  bool hasNext;
+  do {
+    hasNext = reader.ReadRecord(&dest, &data);
+    count += 1;
+  } while (hasNext);
+  spdlog::info("read {} pairs", count);
+}
+
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);

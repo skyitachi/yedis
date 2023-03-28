@@ -6,6 +6,7 @@
 #define YEDIS_WAL_H
 #include <string_view>
 
+#include "log_format.h"
 #include "common/status.h"
 #include "file_buffer.h"
 
@@ -34,6 +35,7 @@ namespace wal {
     FileHandle& handle_;
     std::unique_ptr<FileBuffer> file_buffer_;
     int block_offset_;
+    uint32_t type_crc_[kMaxRecordType + 1];
   };
 
   class Reader {
@@ -48,6 +50,7 @@ namespace wal {
   private:
     FileHandle& handle_;
     uint64_t offset_;
+    uint32_t type_crc_[kMaxRecordType + 1];
   };
 }
 }
