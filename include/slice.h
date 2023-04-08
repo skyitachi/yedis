@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstring>
 #include <string_view>
+#include <iostream>
 
 namespace yedis {
   class Slice {

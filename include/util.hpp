@@ -8,45 +8,19 @@
 #include <cstring>
 
 namespace yedis {
-inline void EncodeFixed32(char* dst, uint32_t value) {
-  uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
-  // little endian
-  std::memcpy(buffer, &value, sizeof(uint32_t));
-}
+char* EncodeVarint64(char* dst, uint64_t v);
+char* EncodeVarint32(char* dst, uint32_t v);
+int VarintLength(uint64_t v);
+void EncodeFixed32(char* dst, uint32_t value);
+uint32_t DecodeFixed32(const char* ptr);
+uint64_t DecodeFixed64(const char* ptr);
+void EncodeFixed64(char *dst, uint64_t value);
+void PutFixed32(std::string* dst, uint32_t value);
+void PutByte(std::string* dst, char value);
 
-inline uint32_t DecodeFixed32(const char* ptr) {
-  const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
-
-  uint32_t result;
-  std::memcpy(&result, buffer, sizeof(uint32_t));
-  return result;
-}
-
-//　default little endian
-inline void EncodeFixed64(char *dst, uint64_t value) {
-  uint8_t *const buffer = reinterpret_cast<uint8_t*>(dst);
-  std::memcpy(buffer, &value, sizeof(uint64_t));
-}
-
-inline uint64_t DecodeFixed64(const char* ptr) {
-  const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
-
-  uint64_t result;
-  std::memcpy(&result, buffer, sizeof(uint64_t));
-  return result;
-}
-
-inline void PutFixed32(std::string* dst, uint32_t value) {
-  char buf[sizeof(value)];
-  EncodeFixed32(buf, value);
-  dst->append(buf, sizeof(buf));
-}
-
-inline void PutByte(std::string* dst, char value) {
-  char buf[1] = {value};
-  dst->append(buf, 1);
-}
+const char* GetVarint32PtrFallback(const char* p, const char* limit, uint32_t* value);
+const char* GetVarint32Ptr(const char* p, const char* limit, uint32_t* value);
 
 template<class T>
 inline void EncodeFixed(void* dst, T value) {
@@ -60,6 +34,14 @@ inline T DecodeFixed(void *src) {
   uint8_t* const buffer = reinterpret_cast<uint8_t*>(src);
   return *reinterpret_cast<T *>(buffer);
 }
+
+template<class T>
+inline void PutFixed(std::string* dst, T value) {
+  char buf[sizeof(value)];
+  EncodeFixed<T>(buf, value);
+  dst->append(buf, sizeof(value));
+}
+
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

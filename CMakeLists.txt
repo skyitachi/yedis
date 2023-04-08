@@ -7,9 +7,9 @@ set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    include_directories(./include deps/spdlog/include deps/gtest/googletest/include)
+    include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp)
 ELSE()
-    include_directories(./include deps/spdlog/include deps/gtest/googletest/include)
+    include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp/)
 ENDIF()
 
 
@@ -34,4 +34,5 @@ target_sources(yedis
 
 add_subdirectory(deps/spdlog)
 add_subdirectory(deps/gtest)
+add_subdirectory(deps/abseil-cpp)
 add_subdirectory(tests)

@@ -1,4 +1,5 @@
 include_directories("${CMAKE_SOURCE_DIR}/src")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g")
 
 add_executable(btree_node_page_test btree_node_page_test.cpp)
 target_link_libraries(btree_node_page_test yedis spdlog gtest)
@@ -24,6 +25,8 @@ target_link_libraries(rwlatch_test spdlog gtest)
 add_executable(allocator_test allocator_test.cpp)
 target_link_libraries(allocator_test yedis spdlog gtest)
 
-find_package(absl REQUIRED)
 add_executable(fs_test fs_test.cpp)
 target_link_libraries(fs_test yedis spdlog gtest absl::strings crc32c)
+
+add_executable(memtable_test memtable_test.cpp)
+target_link_libraries(memtable_test spdlog gtest absl::strings crc32c folly glog yedis)
