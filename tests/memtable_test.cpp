@@ -14,16 +14,32 @@ TEST(MemTableTest, Basic) {
   using namespace yedis;
   MemTable memtable{};
   memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
-//  memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
+  memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
 
   auto lk = LookupKey("k1", 1);
-  spdlog::info("lk memkey len: {}", lk.memtable_key().size());
   Status status;
   std::string value;
   bool success = memtable.Get(lk, &value, &status);
   ASSERT_TRUE(success);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(value, "v1");
+
+  // lookup key seq 高于最大seq，返回false
+  // TODO: this case not work well
+  auto lk1 = LookupKey("k1", 2);
+  success = memtable.Get(lk, &value, &status);
+  ASSERT_FALSE(success);
+
+  auto lk2 = LookupKey("k2", 2);
+  success = memtable.Get(lk2, &value, &status);
+  ASSERT_TRUE(success);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(value, "v2");
+
+  auto lk3 = LookupKey("k2", 1);
+  success = memtable.Get(lk3, &value, &status);
+  ASSERT_TRUE(success);
+  ASSERT_TRUE(status.ok());
 }
 
 TEST(SliceAllocatorTest, Basic) {

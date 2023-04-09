@@ -11,6 +11,8 @@ TEST(AllocatorTest, Basic) {
   auto ptr = allocator.AllocateData(4096);
   ASSERT_TRUE(ptr);
 
+  auto allocatedData = allocator.Allocate(4096);
+
 }
 
 int main(int argc, char **argv) {

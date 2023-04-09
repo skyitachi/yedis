@@ -58,7 +58,9 @@ LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   kstart_ = dst;
   std::memcpy(dst, user_key.data(), usize);
   dst += usize;
-  EncodeFixed64(dst, PackSequenceAndType(s, kValueTypeForSeek));
+  auto tag = PackSequenceAndType(s, kValueTypeForSeek);
+  std::cout << "user_key: " << user_key.ToString() <<  ", tag is " << tag << ", seq is " << s << std::endl;
+  EncodeFixed64(dst, tag);
   dst += 8;
   end_ = dst;
 }
