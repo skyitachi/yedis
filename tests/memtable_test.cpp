@@ -13,7 +13,7 @@
 TEST(MemTableTest, Basic) {
   using namespace yedis;
   MemTable memtable{};
-  memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
+  memtable.Add(3, ValueType::kTypeValue, "k1", "v1");
   memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
 
   auto lk = LookupKey("k1", 1);
@@ -27,7 +27,8 @@ TEST(MemTableTest, Basic) {
   // lookup key seq 高于最大seq，返回false
   // TODO: this case not work well
   auto lk1 = LookupKey("k1", 2);
-  success = memtable.Get(lk, &value, &status);
+  success = memtable.Get(lk1, &value, &status);
+  spdlog::info("status: {}", status.ToString());
   ASSERT_FALSE(success);
 
   auto lk2 = LookupKey("k2", 2);
@@ -40,6 +41,15 @@ TEST(MemTableTest, Basic) {
   success = memtable.Get(lk3, &value, &status);
   ASSERT_TRUE(success);
   ASSERT_TRUE(status.ok());
+}
+
+TEST(MemtableTest1, SeqTest) {
+  using namespace yedis;
+  MemTable memtable{};
+  memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
+  memtable.Add(2, ValueType::kTypeValue, "k1", "v2");
+  memtable.Add(3, ValueType::kTypeValue, "k1", "v3");
+
 }
 
 TEST(SliceAllocatorTest, Basic) {
@@ -62,7 +72,7 @@ TEST(SkipListTest, LowerBound) {
   ASSERT_EQ(*it, 3);
 }
 
-TEST(RawSliceSkipList, Basic) {
+TEST(RawSliceSkipList, Basic2) {
   using namespace yedis;
   MemTable memtable{};
   auto skip_list = folly::ConcurrentSkipList<Slice, MemTable::KeyComparator>::create(2);
@@ -70,22 +80,25 @@ TEST(RawSliceSkipList, Basic) {
   Slice v1 = "v1";
   Slice entry = memtable.EncodeEntry(1, ValueType::kTypeValue, k1, v1);
   uint32_t ks;
-//  auto origin_ptr = GetVarint32Ptr(entry.data(), entry.data() + 5, &ks);
-//  std::cout << "got internal key length: " << ks << ", offset: " << origin_ptr - entry.data() << std::endl;
-  printf("data ptr: %p, first byte: %d\n", entry.data(), entry.data()[0]);
 
-  std::cout << "before add\n";
+  Slice entry2 = memtable.EncodeEntry(3, ValueType::kTypeValue, k1, "v2");
+  Slice entry3 = memtable.EncodeEntry(5, ValueType::kTypeValue, k1, "v3");
+  skip_list.add(entry2);
+  skip_list.add(entry3);
   skip_list.add(entry);
 
-  std::cout << "after add\n";
+  // first 不是最小的
+  auto first = skip_list.first();
+  auto tag = DecodeFixed64(first->data() + 3);
+  std::cout << "seq: " << (tag >> 8) <<  ", value: " << Slice(first->data() + 12, 2).ToString() << std::endl;
 
-  auto first = *skip_list.first();
-  auto ptr = GetVarint32Ptr(first.data(), first.data() + 5, &ks);
-  std::cout << "got internal key length: " << ks << ", offset: " << ptr - first.data() << std::endl;
+  {
+    Slice search_key = memtable.EncodeEntry(4, ValueType::kTypeValue, k1, "v3");
+    auto it = skip_list.lower_bound(search_key);
+    tag = DecodeFixed64(it->data() + 3);
+    std::cout << "seq: " << (tag >> 8) <<  ", value: " << Slice(it->data() + 12, 2).ToString() << std::endl;
 
-  auto origin_ptr = GetVarint32Ptr(entry.data(), entry.data() + 5, &ks);
-  std::cout << "got internal key length: " << ks << ", offset: " << origin_ptr - entry.data() << std::endl;
-  std::cout << entry.size() << std::endl;
+  }
 
 }
 
