@@ -17,7 +17,7 @@ MemTable::MemTable() {
   table_ = std::make_unique<SkipListType>(kMaxHeight);
 }
 
-int MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
+bool MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
   uint32_t l_key_len;
   const char* a_start = GetVarint32Ptr(a.data(), a.data() + a.size(), &l_key_len);
   uint32_t r_key_len;
@@ -29,15 +29,14 @@ int MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
   if (r == 0) {
     const uint64_t anum = DecodeFixed64(a_start + l_key_len - 8);
     const uint64_t bnum = DecodeFixed64(b_start + r_key_len - 8);
-    std::cout << "l user_key: " << l_user_key.ToString() <<  ", seq: " << anum << "\n r user_key: " << r_user_key.ToString()
-      << ", seq: " << bnum << std::endl;
-    if (anum > bnum) {
-      r = -1;
-    } else if (anum < bnum) {
-      r = 1;
+//    std::cout << "l user_key: " << l_user_key.ToString() <<  ", seq: " << anum << "\n r user_key: " << r_user_key.ToString()
+//      << ", seq: " << bnum << std::endl;
+    if (anum < bnum) {
+      return true;
     }
+    return false;
   }
-  return r;
+  return r < 0;
 }
 
 void MemTable::Add(SequenceNumber seq, ValueType type, const Slice &key, const Slice &value) {
@@ -84,7 +83,7 @@ bool MemTable::Get(const LookupKey &key, std::string *value, Status *s) {
         case ValueType::kTypeValue: {
           uint32_t value_len;
           const char* value_start = GetVarint32Ptr(start + internal_key_len, start + internal_key_len + 5, &value_len);
-          value->append(value_start, value_len);
+          value->assign(value_start, value_len);
           *s = Status::OK();
           return true;
         }
@@ -109,7 +108,7 @@ Slice MemTable::EncodeEntry(SequenceNumber seq, ValueType type, const Slice &key
   buf = EncodeVarint32(buf, value_size);
 
   std::memcpy(buf, value.data(), value_size);
-  return Slice(start, encoded_len);
+  return {start, encoded_len};
 }
 
 }

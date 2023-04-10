@@ -13,7 +13,7 @@
 TEST(MemTableTest, Basic) {
   using namespace yedis;
   MemTable memtable{};
-  memtable.Add(3, ValueType::kTypeValue, "k1", "v1");
+  memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
   memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
 
   auto lk = LookupKey("k1", 1);
@@ -28,7 +28,6 @@ TEST(MemTableTest, Basic) {
   // TODO: this case not work well
   auto lk1 = LookupKey("k1", 2);
   success = memtable.Get(lk1, &value, &status);
-  spdlog::info("status: {}", status.ToString());
   ASSERT_FALSE(success);
 
   auto lk2 = LookupKey("k2", 2);
@@ -66,13 +65,27 @@ TEST(SkipListTest, LowerBound) {
   auto skip_list = folly::ConcurrentSkipList<int>::create(10);
   skip_list.add(1);
   skip_list.add(3);
+  skip_list.add(5);
+  skip_list.add(6);
 
   auto it = skip_list.lower_bound(3);
   ASSERT_TRUE(it != skip_list.end());
   ASSERT_EQ(*it, 3);
+
+  {
+    auto it = skip_list.lower_bound(5);
+    ASSERT_TRUE(it != skip_list.end());
+    ASSERT_EQ(*it, 5);
+  }
+  {
+    auto first = skip_list.first();
+    auto last = skip_list.last();
+    ASSERT_EQ(*first, 1);
+    ASSERT_EQ(*last, 6);
+  }
 }
 
-TEST(RawSliceSkipList, Basic2) {
+TEST(RawSliceSkipList, BasicTest) {
   using namespace yedis;
   MemTable memtable{};
   auto skip_list = folly::ConcurrentSkipList<Slice, MemTable::KeyComparator>::create(2);
@@ -87,6 +100,23 @@ TEST(RawSliceSkipList, Basic2) {
   skip_list.add(entry3);
   skip_list.add(entry);
 
+  {
+    MemTable::KeyComparator comp;
+    auto ret = comp(entry, entry2);
+    ASSERT_TRUE(ret);
+
+    ret = comp(entry2, entry3);
+    ASSERT_TRUE(ret);
+
+    ret = comp(entry3, entry);
+    ASSERT_FALSE(ret);
+
+    Slice entry4 = memtable.EncodeEntry(5, ValueType::kTypeValue, k1, "v5");
+
+    ret = comp(entry3, entry4);
+    ASSERT_FALSE(ret);
+  }
+
   // first 不是最小的
   auto first = skip_list.first();
   auto tag = DecodeFixed64(first->data() + 3);
@@ -97,7 +127,6 @@ TEST(RawSliceSkipList, Basic2) {
     auto it = skip_list.lower_bound(search_key);
     tag = DecodeFixed64(it->data() + 3);
     std::cout << "seq: " << (tag >> 8) <<  ", value: " << Slice(it->data() + 12, 2).ToString() << std::endl;
-
   }
 
 }

@@ -29,7 +29,7 @@ class MemTable {
     Slice EncodeEntry(SequenceNumber seq, ValueType type, const Slice& key, const Slice& value);
 
   struct KeyComparator {
-    int operator()(const Slice& a, const Slice& b) const;
+    bool operator()(const Slice& a, const Slice& b) const;
   };
 
 //  template <class NodeType>
