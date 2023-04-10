@@ -11,10 +11,12 @@
 #include "common/status.h"
 #include "db_format.h"
 #include "allocator.h"
+#include "iterator.h"
 
 namespace yedis {
 
 class InternalKeyComparator;
+class MemTableIterator;
 
 class MemTable {
   public:
@@ -28,22 +30,14 @@ class MemTable {
 
     Slice EncodeEntry(SequenceNumber seq, ValueType type, const Slice& key, const Slice& value);
 
+    Iterator* NewIterator();
+
   struct KeyComparator {
     bool operator()(const Slice& a, const Slice& b) const;
   };
 
-//  template <class NodeType>
-//  struct MyNodeAlloc : public folly::Mallocator<NodeType> {
-//    static NodeType* allocate(size_t n) {
-//      return static_cast<NodeType*>((n * sizeof(NodeType))); // 使用 JEMalloc 分配器分配内存
-//    }
-//
-//    static void deallocate(NodeType* p, size_t n) {
-//      je_free(p); // 使用 JEMalloc 分配器释放内存
-//    }
-//  };
-//
   private:
+    friend class MemTableIterator;
     static constexpr int kMaxHeight = 12;
 
     using SkipListType = folly::ConcurrentSkipList<Slice, KeyComparator>;

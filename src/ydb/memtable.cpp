@@ -10,31 +10,36 @@
 #include "util.hpp"
 #include "db_format.h"
 
-
 namespace yedis {
 
 MemTable::MemTable() {
   table_ = std::make_unique<SkipListType>(kMaxHeight);
 }
 
-bool MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
-  uint32_t l_key_len;
-  const char* a_start = GetVarint32Ptr(a.data(), a.data() + a.size(), &l_key_len);
-  uint32_t r_key_len;
-  const char* b_start = GetVarint32Ptr(b.data(), b.data() + b.size(), &r_key_len);
-  const Slice l_user_key(a_start, l_key_len - 8);
-  const Slice r_user_key(b_start, r_key_len - 8);
+static Slice GetLengthPrefixedSlice(const char *data) {
+  uint32_t len;
+  const char *p = data;
+  p = GetVarint32Ptr(p, p + 5, &len);
+  return {p, len};
+}
 
+// memtable key
+bool MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
+  Slice l_mem_key = GetLengthPrefixedSlice(a.data());
+  Slice r_mem_key = GetLengthPrefixedSlice(b.data());
+  const Slice l_user_key(l_mem_key.data(), l_mem_key.size() - 8);
+  const Slice r_user_key(r_mem_key.data(), r_mem_key.size() - 8);
   int r = l_user_key.compare(r_user_key);
+
   if (r == 0) {
-    const uint64_t anum = DecodeFixed64(a_start + l_key_len - 8);
-    const uint64_t bnum = DecodeFixed64(b_start + r_key_len - 8);
+    const uint64_t anum = DecodeFixed64(l_mem_key.data() + l_mem_key.size() - 8);
+    const uint64_t bnum = DecodeFixed64(r_mem_key.data() + r_mem_key.size() - 8);
     if (anum <= bnum) {
       return false;
     }
     return true;
   }
-  return r >= 0;
+  return r < 0;
 }
 
 void MemTable::Add(SequenceNumber seq, ValueType type, const Slice &key, const Slice &value) {
@@ -109,4 +114,65 @@ Slice MemTable::EncodeEntry(SequenceNumber seq, ValueType type, const Slice &key
   return {start, encoded_len};
 }
 
+static Slice EncodeKey(std::string *scratch, const Slice& target) {
+  scratch->clear();
+  PutVarint32(scratch, target.size());
+  scratch->append(target.data(), target.size());
+  return scratch->data();
+}
+
+
+class MemTableIterator: public Iterator {
+public:
+  using SkipListType = MemTable::SkipListType;
+  using SkipListAccessor = MemTable::SkipList;
+
+  explicit MemTableIterator(SkipListType* table) : iter_(SkipListAccessor::Skipper(SkipListAccessor(table))) {}
+
+  MemTableIterator(const MemTableIterator&) = delete;
+  MemTableIterator& operator=(const MemTableIterator&) = delete;
+  ~MemTableIterator() override = default;
+
+  bool Valid() const override { return iter_.good(); }
+  void Seek(const Slice& k) override { iter_.to(k); }
+  void SeekToFirst() override {
+    auto first = iter_.accessor().first();
+    if (first != nullptr) {
+      iter_.to(*first);
+    }
+  }
+
+  void SeekToLast() override {
+    auto last = iter_.accessor().last();
+    if (last != nullptr) {
+      iter_.to(*last);
+    }
+  }
+  void Next() override {
+    iter_.operator++();
+  }
+  void Prev() override {
+    std::cout << "not support" << std::endl;
+  }
+
+  // memtable key
+  Slice key() const override {
+    assert(iter_.good());
+    return GetLengthPrefixedSlice(iter_.data().data());
+  }
+  Slice value() const override {
+    assert(iter_.good());
+    Slice key_slice = GetLengthPrefixedSlice(iter_.data().data());
+    return GetLengthPrefixedSlice(key_slice.data() + key_slice.size());
+  }
+  Status status() const override { return Status::OK(); }
+
+private:
+  MemTable::SkipList::Skipper iter_;
+  std::string tmp_;
+};
+
+Iterator* MemTable::NewIterator() {
+  return new MemTableIterator(table_.get());
+}
 }

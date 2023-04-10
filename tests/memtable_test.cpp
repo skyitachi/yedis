@@ -10,8 +10,16 @@
 #include "ydb/db_format.h"
 #include "util.hpp"
 
+static yedis::Slice GetLengthPrefixedSlice(const char *data) {
+  uint32_t len;
+  const char *p = data;
+  p = yedis::GetVarint32Ptr(p, p + 5, &len);
+  return {p, len};
+}
+
 TEST(MemTableTest, Basic) {
   using namespace yedis;
+  // unique key
   MemTable memtable{};
   memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
   memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
@@ -80,6 +88,34 @@ TEST(SkipListTest, LowerBound) {
   }
 }
 
+
+TEST(MemTableIteratorTest, IteratorTest) {
+  // unique key
+  using namespace yedis;
+  MemTable memtable{};
+  memtable.Add(1, ValueType::kTypeValue, "k1", "v1");
+  memtable.Add(2, ValueType::kTypeValue, "k2", "v2");
+  memtable.Add(3, ValueType::kTypeValue, "k1", "v11");
+  memtable.Add(5, ValueType::kTypeDeletion, "k1", "");
+
+  auto iter = memtable.NewIterator();
+  iter->SeekToFirst();
+  ASSERT_TRUE(iter->Valid());
+  auto lk1 = memtable.EncodeEntry(5, ValueType::kTypeDeletion, "k1", "");
+  auto internal_key1 = GetLengthPrefixedSlice(lk1.data());
+  ASSERT_EQ(iter->key().compare(internal_key1), 0);
+
+  iter->Next();
+  auto lk2 = LookupKey("k1", 3);
+  ASSERT_EQ(iter->key().compare(lk2.internal_key()), 0);
+
+  iter->SeekToLast();
+  auto lk3 = LookupKey("k2", 2);
+  ASSERT_EQ(iter->key().compare(lk3.internal_key()), 0);
+
+  delete iter;
+}
+
 int main(int argc, char **argv) {
   spdlog::set_level(spdlog::level::debug);
   spdlog::enable_backtrace(16);
@@ -87,6 +123,5 @@ int main(int argc, char **argv) {
 
   testing::InitGoogleTest(&argc, argv);
   google::InitGoogleLogging(*argv);
-
   return RUN_ALL_TESTS();
 }

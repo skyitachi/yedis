@@ -125,5 +125,10 @@ const char* GetVarint32Ptr(const char* p, const char* limit,
   return GetVarint32PtrFallback(p, limit, value);
 }
 
+void PutVarint32(std::string* dst, uint32_t v) {
+  char buf[5];
+  char* ptr = EncodeVarint32(buf, v);
+  dst->append(buf, ptr - buf);
+}
 
 }

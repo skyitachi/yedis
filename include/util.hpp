@@ -18,6 +18,7 @@ uint64_t DecodeFixed64(const char* ptr);
 void EncodeFixed64(char *dst, uint64_t value);
 void PutFixed32(std::string* dst, uint32_t value);
 void PutByte(std::string* dst, char value);
+void PutVarint32(std::string* dst, uint32_t v);
 
 const char* GetVarint32PtrFallback(const char* p, const char* limit, uint32_t* value);
 const char* GetVarint32Ptr(const char* p, const char* limit, uint32_t* value);
