@@ -29,14 +29,12 @@ bool MemTable::KeyComparator::operator()(const Slice& a, const Slice& b) const {
   if (r == 0) {
     const uint64_t anum = DecodeFixed64(a_start + l_key_len - 8);
     const uint64_t bnum = DecodeFixed64(b_start + r_key_len - 8);
-//    std::cout << "l user_key: " << l_user_key.ToString() <<  ", seq: " << anum << "\n r user_key: " << r_user_key.ToString()
-//      << ", seq: " << bnum << std::endl;
-    if (anum < bnum) {
-      return true;
+    if (anum <= bnum) {
+      return false;
     }
-    return false;
+    return true;
   }
-  return r < 0;
+  return r >= 0;
 }
 
 void MemTable::Add(SequenceNumber seq, ValueType type, const Slice &key, const Slice &value) {
