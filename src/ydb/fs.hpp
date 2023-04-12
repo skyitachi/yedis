@@ -22,6 +22,7 @@ public:
   virtual void Close() = 0;
   virtual int64_t FileSize() = 0;
   int64_t Read(void* buffer, int64_t nr_bytes);
+  // same as append
   int64_t Write(void *buffer, int64_t nr_bytes);
 
   int64_t Read(void *buffer, int64_t nr_bytes, int64_t location);

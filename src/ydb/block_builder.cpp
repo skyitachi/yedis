@@ -20,6 +20,19 @@ void BlockBuilder::Reset() {
   buffer_.clear();
 }
 
+size_t BlockBuilder::CurrentSizeEstimate() const {
+  return buffer_.size() + restarts_.size() * sizeof(uint32_t) + sizeof(uint32_t);
+}
+
+Slice BlockBuilder::Finish() {
+  for(auto offset: restarts_) {
+    PutFixed32(&buffer_, offset);
+  }
+  PutFixed32(&buffer_, restarts_.size());
+  finished_ = true;
+  return Slice(buffer_);
+}
+
 void BlockBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
   int32_t shared = 0;
   if (counter_ < options_->block_restart_interval) {

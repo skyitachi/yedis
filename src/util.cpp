@@ -131,4 +131,39 @@ void PutVarint32(std::string* dst, uint32_t v) {
   dst->append(buf, ptr - buf);
 }
 
+void PutVarint64(std::string* dst, uint64_t v) {
+  char buf[10];
+  char *ptr = EncodeVarint64(buf, v);
+  dst->append(buf, ptr - buf);
+}
+
+const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value) {
+  uint64_t result = 0;
+  for (uint32_t shift = 0; shift <= 63 && p < limit; shift += 7) {
+    uint64_t byte = *(reinterpret_cast<const uint8_t*>(p));
+    p++;
+    if (byte & 128) {
+      // More bytes are present
+      result |= ((byte & 127) << shift);
+    } else {
+      result |= (byte << shift);
+      *value = result;
+      return reinterpret_cast<const char*>(p);
+    }
+  }
+  return nullptr;
+}
+
+bool GetVarint64(Slice* input, uint64_t* value) {
+  const char* p = input->data();
+  const char* limit = p + input->size();
+  const char* q = GetVarint64Ptr(p, limit, value);
+  if (q == nullptr) {
+    return false;
+  } else {
+    *input = Slice(q, limit - q);
+    return true;
+  }
+}
+
 }

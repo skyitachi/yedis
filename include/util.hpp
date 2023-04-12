@@ -7,6 +7,8 @@
 #include <string>
 #include <cstring>
 
+#include "common/status.h"
+
 namespace yedis {
 
 char* EncodeVarint64(char* dst, uint64_t v);
@@ -19,9 +21,13 @@ void EncodeFixed64(char *dst, uint64_t value);
 void PutFixed32(std::string* dst, uint32_t value);
 void PutByte(std::string* dst, char value);
 void PutVarint32(std::string* dst, uint32_t v);
+void PutVarint64(std::string* dst, uint32_t v);
 
 const char* GetVarint32PtrFallback(const char* p, const char* limit, uint32_t* value);
 const char* GetVarint32Ptr(const char* p, const char* limit, uint32_t* value);
+const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value);
+
+bool GetVarint64(Slice* input, uint64_t* value);
 
 template<class T>
 inline void EncodeFixed(void* dst, T value) {
