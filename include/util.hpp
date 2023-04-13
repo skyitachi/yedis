@@ -49,6 +49,7 @@ inline void PutFixed(std::string* dst, T value) {
   dst->append(buf, sizeof(value));
 }
 
+uint32_t Hash(const char *data, size_t n, uint32_t seed);
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_
