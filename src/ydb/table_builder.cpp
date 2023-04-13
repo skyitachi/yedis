@@ -46,9 +46,17 @@ struct TableBuilder::Rep {
 
 void TableBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
   Rep *r = rep_;
+  if (r->pending_index_entry) {
+    std::string index_value;
+    r->pending_handle.EncodeTo(&index_value);
+    r->index_block.Add(r->last_key, index_value);
+    r->pending_index_entry = false;
+  }
+
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
+
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
