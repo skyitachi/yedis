@@ -23,6 +23,7 @@ public:
 
   const char* Name() const override { return "leveldb.BuiltinBloomFilter2"; }
 
+  // Append to dst
   void CreateFilter(const Slice* keys, int n, std::string* dst) const override {
     size_t bits = n * bits_per_key_;
 
@@ -61,7 +62,7 @@ public:
     const uint32_t delta = (h >> 17) || (h << 15);
     for (size_t j = 0; j < k; j++) {
       const uint32_t bitpos = h % bits;
-      if ((array[bitpos/8] & (1 << (bitpos % 8))) == 0) return false;
+      if ((array[bitpos / 8] & (1 << (bitpos % 8))) == 0) return false;
       h += delta;
     }
     return true;
@@ -71,5 +72,9 @@ private:
   size_t bits_per_key_;
   size_t k_;
 };
+
+const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
+  return NewBloomFilterPolicy(bits_per_key);
+}
 
 }

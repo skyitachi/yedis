@@ -9,6 +9,7 @@
 #include "exception.h"
 #include "common/checksum.h"
 #include "util.hpp"
+#include "filter_block.h"
 
 namespace yedis {
 
@@ -42,6 +43,7 @@ struct TableBuilder::Rep {
   BlockHandle pending_handle;  // Handle to add to index block
 
   std::string compressed_output;
+  FilterBlockBuilder* filter_block;
 };
 
 void TableBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
@@ -51,6 +53,10 @@ void TableBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
     r->pending_handle.EncodeTo(&index_value);
     r->index_block.Add(r->last_key, index_value);
     r->pending_index_entry = false;
+  }
+
+  if (r->filter_block != nullptr) {
+    r->filter_block->AddKey(key);
   }
 
   r->last_key.assign(key.data(), key.size());
@@ -73,6 +79,10 @@ void TableBuilder::Flush() {
   WriteBlock(&r->data_block, &r->pending_handle);
   if (r->status.ok()) {
     r->pending_index_entry = true;
+  }
+
+  if (r->filter_block != nullptr) {
+    r->filter_block->StartBlock(r->offset);
   }
 }
 
