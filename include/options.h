@@ -4,6 +4,10 @@
 
 #ifndef YEDIS_OPTIONS_H
 #define YEDIS_OPTIONS_H
+#include <stddef.h>
+
+#include "slice.h"
+
 namespace yedis {
 
   class Cache;

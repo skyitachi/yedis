@@ -30,3 +30,6 @@ target_link_libraries(fs_test yedis spdlog gtest absl::strings crc32c)
 
 add_executable(memtable_test memtable_test.cpp)
 target_link_libraries(memtable_test spdlog gtest absl::strings crc32c folly glog yedis)
+
+add_executable(table_builder_test table_builder_test.cpp)
+target_link_libraries(table_builder_test spdlog gtest absl::strings crc32c folly glog yedis)

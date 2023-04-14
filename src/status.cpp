@@ -4,6 +4,15 @@
 #include <common/status.h>
 
 namespace yedis {
+
+
+  const char* Status::CopyState(const char* state) {
+    uint32_t size;
+    std::memcpy(&size, state, sizeof(size));
+    char* result = new char[size + 5];
+    std::memcpy(result, state, size + 5);
+    return result;
+  }
   Status::Status(Code code, const Slice& msg, const Slice& msg2) {
     assert(code != kOk);
     const uint32_t len1 = static_cast<uint32_t>(msg.size());
