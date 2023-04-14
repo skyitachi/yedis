@@ -61,7 +61,7 @@ Slice FilterBlockBuilder::Finish() {
     PutFixed32(&result_, filter_offsets_[i]);
   }
   PutFixed32(&result_, array_offset);
-  // why
+  // why, reader need this
   result_.push_back(kFilterBaseLg);
   return Slice(result_);
 }

@@ -5,6 +5,8 @@
 #ifndef YEDIS_COMPARATOR_H
 #define YEDIS_COMPARATOR_H
 
+#include <string>
+
 namespace yedis {
 
 class Slice;
@@ -27,6 +29,12 @@ public:
   // by any clients of this package.
   virtual const char* Name() const = 0;
 
+  virtual void FindShortestSeparator(std::string* start, const Slice& limit) const = 0;
+
+  virtual void FindShortestSuccessor(std::string* key) const = 0;
+
 };
+
+const Comparator* BytewiseComparator();
 }
 #endif //YEDIS_COMPARATOR_H

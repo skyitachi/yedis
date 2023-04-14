@@ -10,6 +10,8 @@
 #include "common/checksum.h"
 #include "util.hpp"
 #include "filter_block.h"
+#include "comparator.h"
+#include "filter_policy.h"
 
 namespace yedis {
 
@@ -46,9 +48,22 @@ struct TableBuilder::Rep {
   FilterBlockBuilder* filter_block;
 };
 
+TableBuilder::TableBuilder(const yedis::Options &options, yedis::FileHandle *file): rep_(new Rep(options, file)) {
+  if (rep_->filter_block != nullptr) {
+    rep_->filter_block->StartBlock(0);
+  }
+}
+
+TableBuilder::~TableBuilder() {
+  assert(rep_->closed);
+  delete rep_->filter_block;
+  delete rep_;
+}
+
 void TableBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
   Rep *r = rep_;
   if (r->pending_index_entry) {
+    r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string index_value;
     r->pending_handle.EncodeTo(&index_value);
     r->index_block.Add(r->last_key, index_value);
@@ -62,7 +77,6 @@ void TableBuilder::Add(const yedis::Slice &key, const yedis::Slice &value) {
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
-
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
@@ -128,7 +142,55 @@ void TableBuilder::WriteRawBlock(const Slice &data, CompressionType cType, Block
       r->offset += data.size() + kBlockTrailerSize;
     }
   }
+}
 
+Status TableBuilder::Finish() {
+  Rep* r = rep_;
+  Flush();
+  assert(!r->closed);
+  r->closed = true;
+
+  BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
+
+  if (r->status.ok() && r->filter_block != nullptr) {
+    WriteRawBlock(r->filter_block->Finish(), CompressionType::kNoCompression, &filter_block_handle);
+  }
+
+  if (r->status.ok()) {
+    BlockBuilder meta_index_block(&r->options);
+    if (r->filter_block != nullptr) {
+      std::string key = "filter.";
+      key.append(r->options.filter_policy->Name());
+      std::string handle_encoding;
+      filter_block_handle.EncodeTo(&handle_encoding);
+      meta_index_block.Add(key, handle_encoding);
+    }
+
+    WriteBlock(&meta_index_block, &metaindex_block_handle);
+  }
+
+  if (r->status.ok()) {
+    if (r->pending_index_entry) {
+      r->options.comparator->FindShortestSuccessor(&r->last_key);
+      std::string handle_encoding;
+      r->pending_handle.EncodeTo(&handle_encoding);
+      r->index_block.Add(r->last_key, Slice(handle_encoding));
+      r->pending_index_entry = false;
+    }
+    WriteBlock(&r->index_block, &index_block_handle);
+  }
+
+  if (r->status.ok()) {
+    Footer footer;
+    footer.set_metaindex_handle(metaindex_block_handle);
+    footer.set_index_handle(index_block_handle);
+
+    std::string footer_encoding;
+    footer.EncodeTo(&footer_encoding);
+    r->file->Write(footer_encoding.data(), footer_encoding.size());
+    r->offset += footer_encoding.size();
+  }
+  return r->status;
 }
 
 }

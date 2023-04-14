@@ -13,12 +13,12 @@
 namespace yedis {
 class BlockBuilder;
 class BlockHandle;
-class WritableFile;
+class FileHandle;
 
 class TableBuilder {
 
 public:
-  TableBuilder(const Options& options, WritableFile* file);
+  TableBuilder(const Options& options, FileHandle* file);
 
   TableBuilder(const TableBuilder&) = delete;
   TableBuilder& operator=(const TableBuilder&) = delete;
