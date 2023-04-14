@@ -20,7 +20,6 @@ namespace yedis {
 
   static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1);
 
-
   struct ParsedInternalKey {
     Slice user_key;
     SequenceNumber sequence;

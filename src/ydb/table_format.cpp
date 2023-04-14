@@ -4,10 +4,10 @@
 
 #include "table_format.h"
 #include "util.hpp"
+#include "fs.hpp"
+#include "options.h"
 
 namespace yedis {
-
-BlockHandle::BlockHandle(): offset_(0), size_(0) {}
 
 void BlockHandle::EncodeTo(std::string *dst) const {
   PutVarint64(dst, offset_);
@@ -52,6 +52,29 @@ Status Footer::DecodeFrom(Slice *input) {
     *input = Slice(end, input->data() + input->size() - end);
   }
   return result;
+}
+
+Status ReadBlock(FileHandle* file, const ReadOptions& options, const BlockHandle& handle, BlockContents* result) {
+  result->data = Slice();
+  result->cachable = false;
+  result->heap_allocated = false;
+
+  size_t n = static_cast<size_t>(handle.size());
+  char* buf = new char[n + kBlockTrailerSize];
+  file->Read(buf, n + kBlockTrailerSize, handle.offset());
+  Slice contents{buf, n + kBlockTrailerSize};
+  if (contents.size() != n + kBlockTrailerSize) {
+    delete[] buf;
+    return Status::Corruption("truncated block read");
+  }
+
+  const char* data = contents.data();
+
+  // TODO: verify crc
+  if (options.verify_checksums) {
+
+  }
+
 }
 
 }

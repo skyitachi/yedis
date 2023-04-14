@@ -13,6 +13,8 @@
 #include "comparator.h"
 #include "filter_policy.h"
 
+#include <spdlog/spdlog.h>
+
 namespace yedis {
 
 struct TableBuilder::Rep {
@@ -25,8 +27,12 @@ struct TableBuilder::Rep {
         index_block(&index_block_options),
         num_entries(0),
         closed(false),
-        pending_index_entry(false) {
+        pending_index_entry(false),
+        filter_block(nullptr) {
     index_block_options.block_restart_interval = 1;
+    if (options.filter_policy != nullptr) {
+      filter_block = new FilterBlockBuilder(options.filter_policy);
+    }
   }
 
   Options options;
