@@ -6,6 +6,8 @@
 #include "util.hpp"
 #include "fs.hpp"
 #include "options.h"
+#include "exception.h"
+#include "common/checksum.h"
 
 namespace yedis {
 
@@ -70,11 +72,24 @@ Status ReadBlock(FileHandle* file, const ReadOptions& options, const BlockHandle
 
   const char* data = contents.data();
 
-  // TODO: verify crc
+  // compression type
+  auto cType = static_cast<CompressionType>(buf[n]);
+  if (cType != kNoCompression)
+    return Status::Corruption("unexpected compression type");
+
   if (options.verify_checksums) {
-
+    uint32_t crc = crc32::Value((uint8_t *) buf, n);
+    crc = crc32::Extend(crc, reinterpret_cast<uint8_t *>(buf + n), 1);  // Extend crc to cover block type
+    crc = crc32::Mask(crc);
+    if (crc != DecodeFixed32(data + n + 1)) {
+      return Status::Corruption("unexpected checksum");
+    }
   }
-
+  result->data = Slice(buf, n);
+  result->heap_allocated = true;
+  // TODO: what's the meaning of cacheable
+  result->cachable = true;
+  return Status::OK();
 }
 
 }
