@@ -36,7 +36,10 @@ private:
   void SkipEmptyDataBlocksBackward();
 
   void SetDataIterator(Iterator* data_iter) {
-    if (data_iter_ != nullptr) SaveError(data_iter_->status());
+    if (data_iter_ != nullptr) {
+      SaveError(data_iter_->status());
+      delete data_iter_;
+    }
     data_iter_ = data_iter;
   }
 
@@ -80,7 +83,16 @@ TwoLevelIterator::TwoLevelIterator(yedis::Iterator *index_iter,
      index_iter_(index_iter),
      data_iter_(nullptr) {}
 
-TwoLevelIterator::~TwoLevelIterator() = default;
+
+// 终于发现为什么需要Iterator wrapper了
+TwoLevelIterator::~TwoLevelIterator() {
+  if (data_iter_ != nullptr) {
+    delete data_iter_;
+  }
+  if (index_iter_ != nullptr) {
+    delete index_iter_;
+  }
+};
 
 void TwoLevelIterator::InitDataBlock() {
   if (!index_iter_->Valid()) {

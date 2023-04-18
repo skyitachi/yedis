@@ -18,6 +18,7 @@
 #include "filter_policy.h"
 #include "table.h"
 #include "iterator.h"
+#include "cache.h"
 
 TEST(TableBuildTest, Basic) {
   using namespace yedis;
@@ -80,6 +81,7 @@ TEST(TableTest, Basic) {
   Options options{};
   options.compression = CompressionType::kNoCompression;
   options.filter_policy = NewBloomFilterPolicy(8);
+  options.block_cache = NewLRUCache(4096);
 
   Table* table;
   Status status = Table::Open(options, file_handle.get(), &table);
@@ -87,6 +89,7 @@ TEST(TableTest, Basic) {
 
   ReadOptions read_opt;
   read_opt.verify_checksums = true;
+  read_opt.fill_cache = true;
 
   auto iter = table->NewIterator(read_opt);
   iter->SeekToFirst();
@@ -94,6 +97,8 @@ TEST(TableTest, Basic) {
     spdlog::info("key: {}, value: {}", iter->key().ToString(), iter->value().ToString());
     iter->Next();
   }
+  delete iter;
+  spdlog::info("total usage: {}", options.block_cache->TotalCharge());
 }
 
 int main(int argc, char **argv) {

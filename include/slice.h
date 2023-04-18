@@ -24,13 +24,15 @@ namespace yedis {
 
       // Create a slice that refers to s[0,strlen(s)-1]
       Slice(const char* s) : data_(s), size_(s == nullptr ? 0 : strlen(s)) {}
-      Slice(std::string_view s): data_(s.data()), size_(s.size()) {
-        std::cout << "in string_view constructor\n";
-      }
+      Slice(std::string_view s): data_(s.data()), size_(s.size()) {}
 
       // Intentionally copyable.
       Slice(const Slice&) = default;
       Slice& operator=(const Slice&) = default;
+
+      bool operator<(const Slice& right) const {
+        return compare(right) < 0;
+      }
 
       // Return a pointer to the beginning of the referenced data
       const char* data() const { return data_; }
@@ -81,6 +83,7 @@ namespace yedis {
   };
 
   inline bool operator==(const Slice& x, const Slice& y) {
+    std::cout << x.size() << " , y.size: " << y.size() << std::endl;
     return ((x.size() == y.size()) &&
             (memcmp(x.data(), y.data(), x.size()) == 0));
   }

@@ -203,6 +203,7 @@ uint32_t Hash(const char* data, size_t n, uint32_t seed) {
       h ^= (h >> r);
       break;
   }
+//  std::cout << "key: " << DecodeFixed32(data) << ", hash: " << h << std::endl;
   return h;
 }
 

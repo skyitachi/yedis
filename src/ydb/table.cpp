@@ -10,6 +10,10 @@
 #include "comparator.h"
 #include "filter_block.h"
 #include "two_level_iterator.h"
+#include "cache.h"
+#include "util.hpp"
+#include "iterator.h"
+
 
 namespace yedis {
 
@@ -60,8 +64,7 @@ Status Table::Open(const Options &options, FileHandle *file, Table **table) {
     rep->metaindex_handle = footer.metaindex_handle();
     rep->index_block = index_block;
     rep->filter_data = nullptr;
-//     TODO:
-//    rep->cache_id
+    rep->cache_id = (options.block_cache ? options.block_cache->NewId() : 0);
     *table = new Table(rep);
     (*table)->ReadMeta(footer);
   }
@@ -124,27 +127,68 @@ void Table::ReadFilter(const Slice &filter_handle_value) {
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block_contents.data);
 }
 
-// TODO: no cache support
-// MUST add cache support
+static void DeleteBlock(void *arg, void* ignored) {
+  spdlog::info("deleteblock");
+  delete reinterpret_cast<Block*>(arg);
+}
+
+static void DeleteCachedBlock(const Slice& key, void* value) {
+  auto* block = reinterpret_cast<Block*>(value);
+  delete block;
+}
+
+static void ReleaseBlock(void *arg, void *h) {
+  auto* cache = reinterpret_cast<Cache*>(arg);
+  auto* handle = reinterpret_cast<Cache::Handle*>(h);
+  cache->Release(handle);
+}
+
 Iterator *Table::BlockReader(void *arg, const ReadOptions &option, const Slice &index_value) {
-  Table* table = reinterpret_cast<Table*>(arg);
-//  Cache* block_cache = table->rep_->options.block_cache;
+  auto* table = reinterpret_cast<Table*>(arg);
+  Cache* block_cache = table->rep_->options.block_cache;
   Block* block = nullptr;
-//  Cache::Handle* cache_handle = nullptr;
+  Cache::Handle* cache_handle = nullptr;
+
   BlockHandle handle;
   Slice input = index_value;
   Status s = handle.DecodeFrom(&input);
   if (s.ok()) {
     BlockContents contents;
-    s = ReadBlock(table->rep_->file, option, handle, &contents);
-    if (s.ok()) {
-      block = new Block(contents);
+    if (block_cache != nullptr) {
+      char cache_key_buffer[16];
+      EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
+      EncodeFixed64(cache_key_buffer + 8, handle.offset());
+      Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+      cache_handle = block_cache->Lookup(key);
+      if (cache_handle != nullptr) {
+        block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+      } else {
+        s = ReadBlock(table->rep_->file, option, handle, &contents);
+        if (s.ok()) {
+          block = new Block(contents);
+          if (contents.cachable && option.fill_cache) {
+            cache_handle = block_cache->Insert(key, block, block->size(), &DeleteCachedBlock);
+          }
+        }
+      }
+
+    } else {
+      s = ReadBlock(table->rep_->file, option, handle, &contents);
+      if (s.ok()) {
+        block = new Block(contents);
+      }
     }
   }
 
   Iterator* iter;
   if (block != nullptr) {
     iter = block->NewIterator(table->rep_->options.comparator);
+    // IMPORTANT
+    if (cache_handle == nullptr) {
+      iter->RegisterCleanup(&DeleteBlock, block, nullptr);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
   } else {
     iter = NewErrorIterator(s);
   }
