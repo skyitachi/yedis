@@ -23,8 +23,10 @@ namespace yedis {
       Slice(const std::string& s) : data_(s.data()), size_(s.size()) {}
 
       // Create a slice that refers to s[0,strlen(s)-1]
-      Slice(const char* s) : data_(s), size_(strlen(s)) {}
-      Slice(std::string_view s): data_(s.data()), size_(s.size()) {}
+      Slice(const char* s) : data_(s), size_(s == nullptr ? 0 : strlen(s)) {}
+      Slice(std::string_view s): data_(s.data()), size_(s.size()) {
+        std::cout << "in string_view constructor\n";
+      }
 
       // Intentionally copyable.
       Slice(const Slice&) = default;

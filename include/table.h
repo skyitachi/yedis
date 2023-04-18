@@ -12,6 +12,7 @@ namespace yedis {
 class FileHandle;
 class Footer;
 class Iterator;
+struct ReadOptions;
 
 class Table {
 public:
@@ -21,11 +22,13 @@ public:
   Table& operator=(const Table&) = delete;
 
   ~Table();
+
+  Iterator* NewIterator(const ReadOptions&) const;
 private:
   struct Rep;
 
-  static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
 
+  static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
   explicit Table(Rep* rep) : rep_(rep) {}
 
   // Calls (*handle_result)(arg, ...) with the entry found after a call

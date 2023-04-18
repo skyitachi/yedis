@@ -6,11 +6,10 @@
 #include "table.h"
 #include "table_format.h"
 #include "fs.hpp"
-#include "slice.h"
-#include "options.h"
 #include "block.h"
 #include "comparator.h"
 #include "filter_block.h"
+#include "two_level_iterator.h"
 
 namespace yedis {
 
@@ -48,12 +47,12 @@ Status Table::Open(const Options &options, FileHandle *file, Table **table) {
   if (!s.ok()) return s;
 
   BlockContents index_block_contents;
-  ReadOptions opt;
+  ReadOptions opt{};
   opt.verify_checksums = true;
 
   // read index_block
   s = ReadBlock(file, opt, footer.index_handle(), &index_block_contents);
-  if (!s.ok()) {
+  if (s.ok()) {
     auto index_block = new Block(index_block_contents);
     Rep* rep = new Table::Rep;
     rep->options = options;
@@ -125,7 +124,8 @@ void Table::ReadFilter(const Slice &filter_handle_value) {
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block_contents.data);
 }
 
-// TODO: no cache support, 为什么函数签名是void *arg, 减少table.h中的文件依赖? NewTwoLevelIterator 中也会用到
+// TODO: no cache support
+// MUST add cache support
 Iterator *Table::BlockReader(void *arg, const ReadOptions &option, const Slice &index_value) {
   Table* table = reinterpret_cast<Table*>(arg);
 //  Cache* block_cache = table->rep_->options.block_cache;
@@ -180,4 +180,10 @@ Status Table::InternalGet(const ReadOptions& options, const Slice &key, void *ar
   return s;
 }
 
+
+Iterator* Table::NewIterator(const ReadOptions &options) const {
+  return NewTwoLevelIterator(
+      rep_->index_block->NewIterator(rep_->options.comparator),
+      &Table::BlockReader, const_cast<Table*>(this), options);
+}
 }

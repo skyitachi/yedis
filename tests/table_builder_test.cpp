@@ -17,6 +17,7 @@
 #include "ydb/table_builder.h"
 #include "filter_policy.h"
 #include "table.h"
+#include "iterator.h"
 
 TEST(TableBuildTest, Basic) {
   using namespace yedis;
@@ -70,6 +71,29 @@ TEST(LeveldbTableBuildTest, Basic) {
   table_builder->Finish();
   spdlog::info("status: {}", table_builder->status().ToString());
   delete table_builder;
+}
+
+TEST(TableTest, Basic) {
+  using namespace yedis;
+  LocalFileSystem fs;
+  auto file_handle = fs.OpenFile("000001.ydb", O_RDONLY);
+  Options options{};
+  options.compression = CompressionType::kNoCompression;
+  options.filter_policy = NewBloomFilterPolicy(8);
+
+  Table* table;
+  Status status = Table::Open(options, file_handle.get(), &table);
+  ASSERT_TRUE(status.ok());
+
+  ReadOptions read_opt;
+  read_opt.verify_checksums = true;
+
+  auto iter = table->NewIterator(read_opt);
+  iter->SeekToFirst();
+  while (iter->Valid()) {
+    spdlog::info("key: {}, value: {}", iter->key().ToString(), iter->value().ToString());
+    iter->Next();
+  }
 }
 
 int main(int argc, char **argv) {
