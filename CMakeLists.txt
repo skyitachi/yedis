@@ -31,6 +31,8 @@ target_sources(yedis
         ${SOURCE_FILES}
 )
 
+target_compile_options(yedis PRIVATE -Wthread-safety)
+
 
 add_subdirectory(deps/spdlog)
 add_subdirectory(deps/gtest)
