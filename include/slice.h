@@ -83,7 +83,6 @@ namespace yedis {
   };
 
   inline bool operator==(const Slice& x, const Slice& y) {
-    std::cout << x.size() << " , y.size: " << y.size() << std::endl;
     return ((x.size() == y.size()) &&
             (memcmp(x.data(), y.data(), x.size()) == 0));
   }

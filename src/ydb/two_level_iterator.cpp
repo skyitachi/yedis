@@ -4,6 +4,7 @@
 
 #include "two_level_iterator.h"
 #include "options.h"
+#include "table_format.h"
 
 namespace yedis {
 

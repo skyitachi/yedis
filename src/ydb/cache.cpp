@@ -121,7 +121,6 @@ void LRUCache::Ref(LRUHandle* e) {
 void LRUCache::Unref(LRUHandle *e) {
   assert(e->refs > 0);
   e->refs--;
-  std::cout << "unref: " << e->refs << ", key: " << DecodeFixed32(e->key().data()) << std::endl;
   if (e->refs == 0) {
     assert(!e->in_cache);
     (*e->deleter)(e->key(), e->value);

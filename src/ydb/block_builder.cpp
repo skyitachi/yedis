@@ -15,9 +15,11 @@ BlockBuilder::BlockBuilder(const yedis::Options *options):
 
 void BlockBuilder::Reset() {
   restarts_.clear();
+  restarts_.push_back(0);
   counter_ = 0;
   finished_ = false;
   buffer_.clear();
+  last_key_.clear();
 }
 
 size_t BlockBuilder::CurrentSizeEstimate() const {
