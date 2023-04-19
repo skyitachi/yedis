@@ -31,8 +31,11 @@ target_link_libraries(fs_test yedis spdlog gtest absl::strings crc32c)
 add_executable(memtable_test memtable_test.cpp)
 target_link_libraries(memtable_test spdlog gtest absl::strings crc32c folly glog yedis)
 
-add_executable(table_builder_test table_builder_test.cpp)
-target_link_libraries(table_builder_test spdlog gtest absl::strings crc32c folly glog leveldb yedis absl::flat_hash_map)
+add_executable(table_test table_test.cpp)
+target_link_libraries(table_test spdlog gtest absl::strings crc32c folly glog leveldb yedis absl::flat_hash_map)
 
 add_executable(cache_test cache_test.cpp)
 target_link_libraries(cache_test spdlog gtest absl::strings crc32c folly glog yedis absl::flat_hash_map)
+
+add_executable(folly_test folly_test.cpp)
+target_link_libraries(folly_test spdlog folly gtest)
