@@ -38,4 +38,4 @@ add_executable(cache_test cache_test.cpp)
 target_link_libraries(cache_test spdlog gtest absl::strings crc32c folly glog yedis absl::flat_hash_map)
 
 add_executable(folly_test folly_test.cpp)
-target_link_libraries(folly_test spdlog folly gtest)
+target_link_libraries(folly_test spdlog folly gtest glog)
