@@ -4,7 +4,7 @@ project(yedis)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION)
+add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION USE_LOCK_STYLE_THREAD_SAFETY_ATTRIBUTES)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp)

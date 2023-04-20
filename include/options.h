@@ -4,17 +4,24 @@
 
 #ifndef YEDIS_OPTIONS_H
 #define YEDIS_OPTIONS_H
+
 #include <stddef.h>
 
 #include "slice.h"
+#include "ydb/fs.hpp"
 
 namespace yedis {
 
   class Cache;
+
   class Comparator;
+
   class Env;
+
   class FilterPolicy;
+
   class Logger;
+
   class Snapshot;
 
 // DB contents are stored in a set of blocks, each of which holds a
@@ -139,7 +146,11 @@ namespace yedis {
     // Many applications will benefit from passing the result of
     // NewBloomFilterPolicy() here.
     const FilterPolicy *filter_policy = nullptr;
+
+    FileSystem* file_system;
+
   };
+
 
 // Options that control read operations
   struct ReadOptions {

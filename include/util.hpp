@@ -50,6 +50,9 @@ inline void PutFixed(std::string* dst, T value) {
 }
 
 uint32_t Hash(const char *data, size_t n, uint32_t seed);
+
+
+std::string TableFileName(const std::string& dbname, uint64_t number);
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

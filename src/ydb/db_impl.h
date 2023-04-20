@@ -5,13 +5,18 @@
 #ifndef YEDIS_DB_IMPL_H
 #define YEDIS_DB_IMPL_H
 
-#include <db.h>
-
+#include "db.h"
+#include "options.h"
 #include "mutex.h"
 #include "wal.h"
 
-class MemTable;
 namespace yedis {
+
+class VersionEdit;
+class Version;
+class MemTable;
+class Table;
+struct FileMetaData;
 
 class DBImpl: public DB {
 public:
@@ -20,11 +25,17 @@ public:
 
 private:
   void CompactMemTable();
+  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base) EXCLUSIVE_LOCKS_REQUIRED(mu_);
+
+  Status BuildTable(const std::string& dbname, const Options& options, Iterator* iter, FileMetaData* meta);
+
   Mutex mu_;
 
   wal::Writer* wal_writer_;
   MemTable* mem_;
   MemTable* imm_ GUARDED_BY(mu_);
+  std::string db_name_;
+  Options options_;
 };
 
 }

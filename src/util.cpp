@@ -5,6 +5,14 @@
 
 namespace yedis {
 
+static std::string MakeFileName(const std::string& dbname, uint64_t number,
+                                const char* suffix) {
+  char buf[100];
+  std::snprintf(buf, sizeof(buf), "/%06llu.%s",
+                static_cast<unsigned long long>(number), suffix);
+  return dbname + buf;
+}
+
 void EncodeFixed32(char* dst, uint32_t value) {
   uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
@@ -205,6 +213,11 @@ uint32_t Hash(const char* data, size_t n, uint32_t seed) {
   }
 //  std::cout << "key: " << DecodeFixed32(data) << ", hash: " << h << std::endl;
   return h;
+}
+
+std::string TableFileName(const std::string& dbname, uint64_t number) {
+  assert(number > 0);
+  return MakeFileName(dbname, number, "ydb");
 }
 
 
