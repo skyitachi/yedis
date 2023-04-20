@@ -7,6 +7,8 @@
 
 #include <folly/MPMCQueue.h>
 
+#include "concurrent_blocking_queue.h"
+
 TEST(FollyConcurrentQueue, Basic) {
   folly::MPMCQueue<int> queue(10);
 
@@ -30,6 +32,33 @@ TEST(FollyConcurrentQueue, Basic) {
 
   producer_th.join();
   consumer_th.join();
+}
+
+TEST(ConcurrentBlockingQueue, Basic) {
+  using namespace yedis;
+  ConcurrentBlockingQueue<int> queue;
+  std::thread producer_th([&]{
+    for (int i = 0; i < 100; i++) {
+      queue.put(i);
+    }
+  });
+  std::vector<int> results;
+
+  std::thread consumer_th([&] {
+
+    for (int i = 0; i < 100; i++) {
+      int value = queue.take();
+      results.push_back(value);
+    }
+  });
+
+  producer_th.join();
+  consumer_th.join();
+
+  ASSERT_EQ(results.size(), 100);
+  for(int i = 0; i < results.size(); i++) {
+    ASSERT_EQ(i, results[i]);
+  }
 
 }
 
