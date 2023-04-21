@@ -195,7 +195,8 @@ public:
   }
 };
 
-Status VersionSet::LogAndApply(VersionEdit *edit, Mutex *mu) {
+Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
+  assert(mu->try_lock());
   if (edit->log_number_.has_value()) {
     assert(edit->log_number_ >= log_number_);
     assert(edit->log_number_ < next_file_number_);
@@ -232,7 +233,7 @@ Status VersionSet::LogAndApply(VersionEdit *edit, Mutex *mu) {
 
   // write edit to manifest
   {
-    mu->Unlock();
+    mu->unlock();
     if (s.ok()) {
       std::string record;
       edit->EncodeTo(&record);
@@ -242,7 +243,7 @@ Status VersionSet::LogAndApply(VersionEdit *edit, Mutex *mu) {
     if (s.ok() && !new_manifest_file.empty()) {
       SetCurrentFile(options_->file_system, db_name_, manifest_file_number_);
     }
-    mu->Lock();
+    mu->lock();
   }
   if (s.ok()) {
     AppendVersion(v);

@@ -5,6 +5,8 @@
 #ifndef YEDIS_DB_IMPL_H
 #define YEDIS_DB_IMPL_H
 
+#include <condition_variable>
+
 #include "db.h"
 #include "options.h"
 #include "mutex.h"
@@ -26,21 +28,31 @@ public:
 
 private:
   void CompactMemTable();
-  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base) EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  Status MakeRoomForWrite(bool force);
+  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base);
 
   Status BuildTable(const std::string& dbname, const Options& options, Iterator* iter, FileMetaData* meta);
 
-  Mutex mu_;
+  std::mutex mutex_;
 
+  FileHandle* wal_handle_;
   wal::Writer* wal_writer_;
   MemTable* mem_;
-  MemTable* imm_ GUARDED_BY(mu_);
+  MemTable* imm_;
   std::string db_name_;
   Options options_;
 
-  VersionSet* const versions_ GUARDED_BY(mu_);
+  VersionSet* const versions_;
   // wal file_number
-  uint64_t logfile_number_ GUARDED_BY(mu_);
+  uint64_t logfile_number_;
+  Status bg_error_;
+
+  std::condition_variable background_work_finished_signal_;
+  bool background_compaction_scheduled_;
+
+  void MaybeScheduleCompaction();
+  void BGWork(void *db);
+  void BackgroundCall();
 
 
 };

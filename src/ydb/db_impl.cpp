@@ -15,11 +15,93 @@ namespace yedis {
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
            const Slice& value) {
-  return Status::NotSupported("not implement");
+  // lock by my self
+  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+  lock.lock();
+  Status s = MakeRoomForWrite(false);
+  if (!s.ok()) {
+    return s;
+  }
+  uint64_t last_sequence = versions_->LastSequence();
+  last_sequence += 1;
+  lock.unlock();
+
+  // encode like write batch
+  // TODO: encode
+  Slice write_batch_content;
+  s = wal_writer_->AddRecord(write_batch_content);
+  if (s.ok()) {
+    lock.lock();
+    // TODO: encode
+    mem_->Add(last_sequence, ValueType::kTypeValue, key, value);
+  }
+
+
+  return s;
 }
 
+// Ignore force
+// mutex_ acquired
+Status DBImpl::MakeRoomForWrite(bool force) {
+  assert(mutex_.try_lock());
+  Status s;
+  while (true) {
+    if (!bg_error_.ok()) {
+      s = bg_error_;
+      break;
+    } else if (imm_ != nullptr) {
+      std::unique_lock<std::mutex> lock(mutex_, std::adopt_lock);
+      background_work_finished_signal_.wait(lock);
+      lock.release();
+    } else if (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size) {
+      // enough space
+      break;
+    } else {
+      assert(versions_->PrevLogNumber() == 0);
+      uint64_t new_log_number = versions_->NewFileNumber();
+      delete wal_writer_;
+      delete wal_handle_;
+      // TODO: 这里如何使用unique_ptr管理file_handle
+      wal_handle_ =
+          options_.file_system->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT).get();
+      wal_writer_ = new wal::Writer(*wal_handle_);
+      imm_ = mem_;
+      mem_ = new MemTable();
+      mem_->Ref();
+      MaybeScheduleCompaction();
+    }
+  }
+  return s;
+}
+
+// just compact level0
+// mutex_ acquired
+void DBImpl::MaybeScheduleCompaction() {
+  assert(mutex_.try_lock());
+  if (imm_ != nullptr) {
+    background_compaction_scheduled_ = true;
+    std::thread th([&]{ BackgroundCall(); });
+  }
+}
+
+//void DBImpl::BGWork(void *db) {
+//
+//}
+
+void DBImpl::BackgroundCall() {
+  std::lock_guard<std::mutex> lock_guard(mutex_);
+  assert(background_compaction_scheduled_);
+  if (imm_ != nullptr) {
+    CompactMemTable();
+    background_compaction_scheduled_ = false;
+    background_work_finished_signal_.notify_all();
+    return;
+  }
+}
+
+
 void DBImpl::CompactMemTable() {
-  mu_.AssertHeld();
+  assert(mutex_.try_lock());
   assert(imm_ != nullptr);
   VersionEdit edit;
   Version* base = versions_->current();
@@ -30,7 +112,7 @@ void DBImpl::CompactMemTable() {
   if (s.ok()) {
     edit.SetPrevLogNumber(0);
     edit.SetLogNumber(logfile_number_);
-    s = versions_->LogAndApply(&edit, &mu_);
+    s = versions_->LogAndApply(&edit, &mutex_);
   }
 
   if (s.ok()) {
@@ -41,16 +123,16 @@ void DBImpl::CompactMemTable() {
 }
 
 Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base) {
-  mu_.AssertHeld();
+  assert(mutex_.try_lock());
   FileMetaData meta;
   // TODO:
   meta.number = versions_->NewFileNumber();
   Status s;
   Iterator* iter = mem->NewIterator();
   {
-    mu_.Unlock();
+    mutex_.unlock();
     s = BuildTable(db_name_, options_, iter, &meta);
-    mu_.Lock();
+    mutex_.lock();
   }
   if (!s.ok()) {
     return s;

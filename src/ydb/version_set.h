@@ -137,7 +137,7 @@ public:
   Version* current() const { return current_; }
 
 
-  Status LogAndApply(VersionEdit* edit, Mutex* mu) EXCLUSIVE_LOCKS_REQUIRED(mu);
+  Status LogAndApply(VersionEdit* edit, std::mutex* mu);
   Status Recover(bool *save_manifest);
   void AppendVersion(Version* v);
 

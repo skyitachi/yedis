@@ -242,6 +242,11 @@ std::string CurrentFileName(const std::string& dbname) {
   return dbname + "/CURRENT";
 }
 
+std::string LogFileName(const std::string& dbname, uint64_t number) {
+  assert(number > 0);
+  return MakeFileName(dbname, number, "log");
+}
+
 
 
 }

@@ -57,6 +57,8 @@ std::string TableFileName(const std::string& dbname, uint64_t number);
 std::string DescriptorFileName(const std::string& dbname, uint64_t number);
 std::string TempFileName(const std::string& dbname, uint64_t number);
 std::string CurrentFileName(const std::string& dbname);
+std::string LogFileName(const std::string& dbname, uint64_t number);
+
 
 }
 
