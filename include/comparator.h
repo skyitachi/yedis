@@ -31,7 +31,7 @@ public:
 
   virtual void FindShortestSeparator(std::string* start, const Slice& limit) const = 0;
 
-  virtual void FindShortestSuccessor(std::string* key) const = 0;
+  virtual void FindShortSuccessor(std::string* key) const = 0;
 
 };
 

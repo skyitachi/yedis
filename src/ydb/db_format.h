@@ -77,6 +77,9 @@ namespace yedis {
 
     int Compare(const Slice& a, const Slice& b) const override;
     int Compare(const InternalKey& a, const InternalKey& b) const;
+    void FindShortestSeparator(std::string* start, const Slice& limit) const override;
+    void FindShortSuccessor(std::string* key) const override;
+
   };
 
   class LookupKey {

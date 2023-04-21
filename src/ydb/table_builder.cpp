@@ -177,7 +177,7 @@ Status TableBuilder::Finish() {
 
   if (r->status.ok()) {
     if (r->pending_index_entry) {
-      r->options.comparator->FindShortestSuccessor(&r->last_key);
+      r->options.comparator->FindShortSuccessor(&r->last_key);
       std::string handle_encoding;
       r->pending_handle.EncodeTo(&handle_encoding);
       r->index_block.Add(r->last_key, Slice(handle_encoding));

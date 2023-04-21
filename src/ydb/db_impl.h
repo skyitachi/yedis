@@ -14,6 +14,7 @@ namespace yedis {
 
 class VersionEdit;
 class Version;
+class VersionSet;
 class MemTable;
 class Table;
 struct FileMetaData;
@@ -36,6 +37,12 @@ private:
   MemTable* imm_ GUARDED_BY(mu_);
   std::string db_name_;
   Options options_;
+
+  VersionSet* const versions_ GUARDED_BY(mu_);
+  // wal file_number
+  uint64_t logfile_number_ GUARDED_BY(mu_);
+
+
 };
 
 }

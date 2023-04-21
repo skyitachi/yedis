@@ -102,10 +102,6 @@ namespace yedis::wal {
     return Status::OK();
   }
 
-  Status Writer::AddRecord(const std::string_view sv) {
-    return AddRecord(Slice(sv));
-  }
-
   Reader::Reader(FileHandle &handle, uint64_t initial_offset): handle_(handle), offset_(initial_offset) {
     InitTypeCrc(type_crc_);
   }

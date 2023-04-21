@@ -12,5 +12,11 @@ struct BTreeOptions {
   uint32_t page_size = 4096;
 
 };
+
+namespace config {
+
+  static const int kNumLevels = 7;
+
+}
 }
 #endif //YEDIS_INCLUDE_OPTION_HPP_

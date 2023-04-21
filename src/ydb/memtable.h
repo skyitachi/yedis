@@ -32,6 +32,17 @@ class MemTable {
 
     Iterator* NewIterator();
 
+    void Ref() {
+      refs_++;
+    }
+
+    void Unref() {
+      refs_--;
+      if (refs_ == 0) {
+        delete this;
+      }
+    }
+
   struct KeyComparator {
     bool operator()(const Slice& a, const Slice& b) const;
   };
@@ -46,6 +57,8 @@ class MemTable {
     std::unique_ptr<SkipListType> table_;
 
     Allocator alloc_;
+
+    int refs_;
 
 
   };

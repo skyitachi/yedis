@@ -18,25 +18,38 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   return Status::NotSupported("not implement");
 }
 
-
 void DBImpl::CompactMemTable() {
   mu_.AssertHeld();
   assert(imm_ != nullptr);
+  VersionEdit edit;
+  Version* base = versions_->current();
+  base->Ref();
+  Status s = WriteLevel0Table(imm_, &edit, base);
+  base->Unref();
 
+  if (s.ok()) {
+    edit.SetPrevLogNumber(0);
+    edit.SetLogNumber(logfile_number_);
+    s = versions_->LogAndApply(&edit, &mu_);
+  }
 
-
+  if (s.ok()) {
+    // TODO: clear, 如何清理Memtable， unique_ptr是否可行
+    imm_->Unref();
+    imm_ = nullptr;
+  }
 }
 
 Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base) {
   mu_.AssertHeld();
   FileMetaData meta;
   // TODO:
-//  meta.number = versions_->NewFileNumber();
+  meta.number = versions_->NewFileNumber();
   Status s;
   Iterator* iter = mem->NewIterator();
   {
     mu_.Unlock();
-    s = uildTable(db_name_, options_, iter, &meta);
+    s = BuildTable(db_name_, options_, iter, &meta);
     mu_.Lock();
   }
   if (!s.ok()) {
@@ -44,7 +57,12 @@ Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base)
   }
   delete iter;
   // TODO: 补充下verion需要的信息
-
+  // 本次实现只写到level 0
+  int level = 0;
+  if (s.ok() && meta.file_size > 0) {
+    edit->AddFile(level, meta.number, meta.file_size, meta.smallest, meta.largest);
+  }
+  return s;
 }
 
 Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Iterator *iter, FileMetaData *meta) {
@@ -53,8 +71,8 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   iter->SeekToFirst();
 
   std::string fname = TableFileName(dbname, meta->number);
-  FileHandle* file = options.file_system->OpenFile(fname, O_CREAT | O_RDWR | O_TRUNC).get();
-  auto* builder = new TableBuilder(options, file);
+  auto file_ptr = options.file_system->OpenFile(fname, O_CREAT | O_RDWR | O_TRUNC);
+  auto builder = std::make_unique<TableBuilder>(options, file_ptr.get());
   meta->smallest.DecodeFrom(iter->key());
   Slice key;
   while(iter->Valid()) {
@@ -70,9 +88,6 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
     return s;
   }
   meta->file_size = builder->FileSize();
-  delete builder;
-
-  delete file;
   return s;
 }
 

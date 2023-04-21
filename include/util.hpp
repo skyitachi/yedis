@@ -49,10 +49,15 @@ inline void PutFixed(std::string* dst, T value) {
   dst->append(buf, sizeof(value));
 }
 
+void PutLengthPrefixedSlice(std::string* dst, const Slice& value);
+
 uint32_t Hash(const char *data, size_t n, uint32_t seed);
 
-
 std::string TableFileName(const std::string& dbname, uint64_t number);
+std::string DescriptorFileName(const std::string& dbname, uint64_t number);
+std::string TempFileName(const std::string& dbname, uint64_t number);
+std::string CurrentFileName(const std::string& dbname);
+
 }
 
 #endif //YEDIS_INCLUDE_UTIL_HPP_

@@ -215,10 +215,33 @@ uint32_t Hash(const char* data, size_t n, uint32_t seed) {
   return h;
 }
 
+void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
+  PutVarint32(dst, value.size());
+  dst->append(value.data(), value.size());
+}
+
 std::string TableFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
   return MakeFileName(dbname, number, "ydb");
 }
+
+std::string DescriptorFileName(const std::string& dbname, uint64_t number) {
+  assert(number > 0);
+  char buf[100];
+  std::snprintf(buf, sizeof(buf), "/MANIFEST-%06llu",
+                static_cast<unsigned long long>(number));
+  return dbname + buf;
+}
+
+std::string TempFileName(const std::string& dbname, uint64_t number) {
+  assert(number > 0);
+  return MakeFileName(dbname, number, "dbtmp");
+}
+
+std::string CurrentFileName(const std::string& dbname) {
+  return dbname + "/CURRENT";
+}
+
 
 
 }

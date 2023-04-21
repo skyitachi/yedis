@@ -25,7 +25,6 @@ namespace wal {
     ~Writer();
 
     Status AddRecord(const Slice& slice);
-    Status AddRecord(std::string_view slice);
   private:
     inline int available();
     data_ptr_t data();
