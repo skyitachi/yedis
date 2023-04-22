@@ -247,6 +247,28 @@ std::string LogFileName(const std::string& dbname, uint64_t number) {
   return MakeFileName(dbname, number, "log");
 }
 
+bool GetVarint32(Slice* input, uint32_t* value) {
+  const char* p = input->data();
+  const char* limit = p + input->size();
+  const char* q = GetVarint32Ptr(p, limit, value);
+  if (q == nullptr) {
+    return false;
+  } else {
+    *input = Slice(q, limit - q);
+    return true;
+  }
+}
+
+bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
+  uint32_t len;
+  if (GetVarint32(input, &len) && input->size() >= len) {
+    *result = Slice(input->data(), len);
+    input->remove_prefix(len);
+    return true;
+  } else {
+    return false;
+  }
+}
 
 
 }

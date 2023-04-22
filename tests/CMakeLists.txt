@@ -37,5 +37,8 @@ target_link_libraries(table_test spdlog gtest absl::strings crc32c folly glog le
 add_executable(cache_test cache_test.cpp)
 target_link_libraries(cache_test spdlog gtest absl::strings crc32c folly glog yedis absl::flat_hash_map)
 
+add_executable(db_test db_test.cpp)
+target_link_libraries(cache_test spdlog gtest absl::strings crc32c folly glog yedis absl::flat_hash_map)
+
 add_executable(folly_test folly_test.cpp)
-target_link_libraries(folly_test spdlog folly gtest glog)
+target_link_libraries(folly_test spdlog folly gtest glog fmt)

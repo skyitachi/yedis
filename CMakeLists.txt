@@ -3,13 +3,15 @@ cmake_minimum_required(VERSION 3.10)
 project(yedis)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_LINKER lld)
 
-add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION USE_LOCK_STYLE_THREAD_SAFETY_ATTRIBUTES)
+add_compile_definitions(DEBUG YEDIS_DEBUG_ALLOCATION)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp)
+    add_compile_definitions(USE_LOCK_STYLE_THREAD_SAFETY_ATTRIBUTES)
 ELSE()
-    include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp/)
+    include_directories(./include deps/spdlog/include deps/gtest/googletest/include deps/abseil-cpp)
 ENDIF()
 
 
@@ -30,8 +32,9 @@ target_sources(yedis
     PRIVATE
         ${SOURCE_FILES}
 )
-
-target_compile_options(yedis PRIVATE -Wthread-safety)
+IF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    target_compile_options(yedis PRIVATE -Wthread-safety)
+ENDIF()
 
 
 add_subdirectory(deps/spdlog)

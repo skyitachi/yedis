@@ -4,8 +4,9 @@
 
 #ifndef YEDIS_DB_H
 #define YEDIS_DB_H
-#include <common/status.h>
-#include <iterator.h>
+
+#include "common/status.h"
+#include "iterator.h"
 
 namespace yedis {
 
@@ -16,6 +17,8 @@ class WriteBatch;
 
 class DB {
   public:
+    static Status Open(const Options& options, const std::string& name,
+                       DB** dbptr);
     DB() = default;
 
     DB(const DB&) = delete;
@@ -28,12 +31,12 @@ class DB {
     // success, and a non-OK status on error.  It is not an error if "key"
     // did not exist in the database.
     // Note: consider setting options.sync = true.
-    virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
+//    virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
 
     // Apply the specified updates to the database.
     // Returns OK on success, non-OK on failure.
     // Note: consider setting options.sync = true.
-    virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
+//    virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
 
     // If the database contains an entry for "key" store the
     // corresponding value in *value and return OK.
@@ -42,8 +45,8 @@ class DB {
     // a status for which Status::IsNotFound() returns true.
     //
     // May return some other Status on an error.
-    virtual Status Get(const ReadOptions& options, const Slice& key,
-                       std::string* value) = 0;
+//    virtual Status Get(const ReadOptions& options, const Slice& key,
+//                       std::string* value) = 0;
 
     // Return a heap-allocated iterator over the contents of the database.
     // The result of NewIterator() is initially invalid (caller must
@@ -51,7 +54,7 @@ class DB {
     //
     // Caller should delete the iterator when it is no longer needed.
     // The returned iterator should be deleted before this db is deleted.
-    virtual Iterator* NewIterator(const ReadOptions& options) = 0;
+//    virtual Iterator* NewIterator(const ReadOptions& options) = 0;
 
     virtual ~DB();
 

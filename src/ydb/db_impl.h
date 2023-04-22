@@ -9,8 +9,8 @@
 
 #include "db.h"
 #include "options.h"
-#include "mutex.h"
 #include "wal.h"
+#include "db_format.h"
 
 namespace yedis {
 
@@ -23,6 +23,12 @@ struct FileMetaData;
 
 class DBImpl: public DB {
 public:
+  DBImpl(const Options& raw_options, const std::string& dbname);
+  ~DBImpl() = default;
+
+  DBImpl(const DBImpl&) = delete;
+  DBImpl& operator=(const DBImpl&) = delete;
+
   Status Put(const WriteOptions& options, const Slice& key,
              const Slice& value) override;
 
@@ -40,7 +46,9 @@ private:
   MemTable* mem_;
   MemTable* imm_;
   std::string db_name_;
-  Options options_;
+
+  const Options options_;
+  const InternalKeyComparator internal_comparator_;
 
   VersionSet* const versions_;
   // wal file_number

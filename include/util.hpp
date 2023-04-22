@@ -27,6 +27,7 @@ const char* GetVarint32PtrFallback(const char* p, const char* limit, uint32_t* v
 const char* GetVarint32Ptr(const char* p, const char* limit, uint32_t* value);
 const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value);
 
+bool GetVarint32(Slice* input, uint32_t* value);
 bool GetVarint64(Slice* input, uint64_t* value);
 
 template<class T>
@@ -50,6 +51,7 @@ inline void PutFixed(std::string* dst, T value) {
 }
 
 void PutLengthPrefixedSlice(std::string* dst, const Slice& value);
+bool GetLengthPrefixedSlice(Slice* input, Slice* result);
 
 uint32_t Hash(const char *data, size_t n, uint32_t seed);
 

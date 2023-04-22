@@ -268,4 +268,8 @@ void VersionSet::AppendVersion(Version *v) {
   v->next_->prev_ = v;
 }
 
+VersionSet::VersionSet(const std::string &dbname, const Options *options, const InternalKeyComparator *icmp)
+  : db_name_(dbname), options_(options), icmp_(icmp), dummy_versions_(this) {
+}
+
 }

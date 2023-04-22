@@ -10,12 +10,27 @@
 #include "util.hpp"
 #include "fs.hpp"
 #include "table_builder.h"
+#include "write_batch.h"
+#include "write_batch_internal.h"
+#include "db.h"
+
 
 namespace yedis {
+
+
+DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
+  : db_name_(dbname),
+    options_(raw_options),
+    internal_comparator_(raw_options.comparator),
+    versions_(new VersionSet(db_name_, &options_, &internal_comparator_)) {
+  options_.file_system = new LocalFileSystem;
+}
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
            const Slice& value) {
   // lock by my self
+  WriteBatch batch;
+  batch.Put(key, value);
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
   lock.lock();
   Status s = MakeRoomForWrite(false);
@@ -27,15 +42,12 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   lock.unlock();
 
   // encode like write batch
-  // TODO: encode
-  Slice write_batch_content;
+  Slice write_batch_content = WriteBatchInternal::Contents(&batch);
   s = wal_writer_->AddRecord(write_batch_content);
   if (s.ok()) {
     lock.lock();
-    // TODO: encode
     mem_->Add(last_sequence, ValueType::kTypeValue, key, value);
   }
-
 
   return s;
 }
@@ -171,6 +183,14 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   }
   meta->file_size = builder->FileSize();
   return s;
+}
+
+DB::~DB() = default;
+
+Status DB::Open(const Options &options, const std::string &name, DB **dbptr) {
+  *dbptr = nullptr;
+  DBImpl* impl = new DBImpl(options, name);
+  return Status::OK();
 }
 
 }
