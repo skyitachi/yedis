@@ -38,6 +38,7 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
   lock.lock();
   std::cout << "mem size: " << mem_->ApproximateMemoryUsage() << ", write_buffer_size: " << options_.write_buffer_size << std::endl;
+  // TODO: 这里要wait 压缩线程
   Status s = MakeRoomForWrite(false);
   if (!s.ok()) {
     return s;
@@ -54,7 +55,6 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
     mem_->Add(last_sequence, ValueType::kTypeValue, key, value);
   }
   lock.unlock();
-  // TODO: 这里要wait 压缩线程
   return s;
 }
 
@@ -68,11 +68,14 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       s = bg_error_;
       break;
     } else if (imm_ != nullptr) {
+      // TODO: should wait here
       std::unique_lock<std::mutex> lock(mutex_, std::adopt_lock);
+      std::cout << "wait here" << std::endl;
       background_work_finished_signal_.wait(lock);
+      std::cout << "after wait" << std::endl;
       lock.release();
     } else if (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size) {
-
+      std::cout << "have enough time" << std::endl;
       // enough space
       break;
     } else {
@@ -119,6 +122,7 @@ void DBImpl::BackgroundCall() {
     CompactMemTable();
     background_compaction_scheduled_ = false;
     background_work_finished_signal_.notify_all();
+    std::cout << "notify all" << std::endl;
     return;
   }
 }
