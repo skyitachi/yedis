@@ -8,7 +8,6 @@
 #include <stddef.h>
 
 #include "slice.h"
-#include "ydb/fs.hpp"
 
 namespace yedis {
 
@@ -23,6 +22,7 @@ namespace yedis {
   class Logger;
 
   class Snapshot;
+  class FileSystem;
 
 // DB contents are stored in a set of blocks, each of which holds a
 // sequence of key,value pairs.  Each block may be compressed before

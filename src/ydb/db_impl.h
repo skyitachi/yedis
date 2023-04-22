@@ -6,6 +6,7 @@
 #define YEDIS_DB_IMPL_H
 
 #include <condition_variable>
+#include <thread>
 
 #include "db.h"
 #include "options.h"
@@ -31,6 +32,24 @@ public:
 
   Status Put(const WriteOptions& options, const Slice& key,
              const Slice& value) override;
+  Status Delete(const WriteOptions& options, const Slice& key) override {
+    return Status::NotSupported("no delete method");
+  };
+
+  Status Write(const WriteOptions& options, WriteBatch* updates) override {
+    return Status::NotSupported("no write method");
+  };
+
+  Status Get(const ReadOptions& options, const Slice& key, std::string* value) override {
+    return Status::NotSupported("no get method");
+  }
+
+  Iterator* NewIterator(const ReadOptions& options) override {
+    return nullptr;
+  }
+
+  void prepare();
+
 
 private:
   void CompactMemTable();
@@ -41,13 +60,13 @@ private:
 
   std::mutex mutex_;
 
-  FileHandle* wal_handle_;
+  std::unique_ptr<FileHandle> wal_handle_;
   wal::Writer* wal_writer_;
   MemTable* mem_;
   MemTable* imm_;
   std::string db_name_;
 
-  const Options options_;
+  Options options_;
   const InternalKeyComparator internal_comparator_;
 
   VersionSet* const versions_;
@@ -61,6 +80,9 @@ private:
   void MaybeScheduleCompaction();
   void BGWork(void *db);
   void BackgroundCall();
+
+  std::thread bg_thread_;
+
 
 
 };

@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "common/status.h"
+
 namespace yedis {
 class FileSystem;
 class DB;
@@ -43,6 +45,8 @@ class FileSystem {
   virtual int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes, int64_t location) = 0;
   virtual int64_t Read(FileHandle& handle, void *buffer, int64_t nr_bytes) = 0;
   virtual int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes) = 0;
+  virtual bool Exists(std::string_view path) = 0;
+  virtual Status CreateDir(std::string_view dir) = 0;
 
 
 };
@@ -77,6 +81,10 @@ public:
   int64_t Read(FileHandle& handle, void *buffer, int64_t nr_bytes) override;
 
   int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes) override;
+
+  bool Exists(std::string_view path) override;
+
+  Status CreateDir(std::string_view dir) override;
 
   ~LocalFileSystem() override = default;
 };

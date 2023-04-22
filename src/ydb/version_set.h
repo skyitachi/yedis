@@ -60,7 +60,7 @@ private:
 
   Version(const Version&) = delete;
   Version& operator=(const Version&) = delete;
-  ~Version();
+  ~Version() {};
 
   VersionSet* vset_;
   Version* next_;
@@ -127,7 +127,7 @@ private:
 
 class VersionSet {
 public:
-  VersionSet(const std::string& dbname, const Options* options, const InternalKeyComparator*);
+  VersionSet(std::string  dbname, const Options* options, const InternalKeyComparator*);
   uint64_t NewFileNumber() { return next_file_number_++; }
   uint64_t ManifestFileNumber() const { return manifest_file_number_; }
   uint64_t LastSequence() const { return last_sequence_; }

@@ -31,7 +31,7 @@ class MemTable {
     Slice EncodeEntry(SequenceNumber seq, ValueType type, const Slice& key, const Slice& value);
 
     Iterator* NewIterator();
-    size_t ApproximateMemoryUsage() { return allocated_size_; }
+    size_t ApproximateMemoryUsage() { return alloc_.size(); }
 
     void Ref() {
       refs_++;
@@ -58,7 +58,6 @@ class MemTable {
     std::unique_ptr<SkipListType> table_;
 
     Allocator alloc_;
-    size_t allocated_size_;
 
     int refs_;
 

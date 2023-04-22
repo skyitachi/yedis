@@ -199,4 +199,12 @@ Status TableBuilder::Finish() {
   return r->status;
 }
 
+uint64_t TableBuilder::NumEntries() const {
+  return rep_->num_entries;
+}
+
+uint64_t TableBuilder::FileSize() const {
+  return rep_->offset;
+}
+
 }

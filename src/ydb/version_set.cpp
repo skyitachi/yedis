@@ -2,6 +2,7 @@
 // Created by Shiping Yao on 2023/4/21.
 //
 #include <set>
+#include <utility>
 
 #include "version_set.h"
 #include "util.hpp"
@@ -196,7 +197,7 @@ public:
 };
 
 Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
-  assert(mu->try_lock());
+  assert(!mu->try_lock());
   if (edit->log_number_.has_value()) {
     assert(edit->log_number_ >= log_number_);
     assert(edit->log_number_ < next_file_number_);
@@ -223,7 +224,7 @@ Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
   Status s;
   if (!descriptor_log_) {
     new_manifest_file = DescriptorFileName(db_name_, manifest_file_number_);
-    descriptor_log_ = options_->file_system->Open(new_manifest_file, O_RDWR | O_CREAT);
+    descriptor_log_ = options_->file_system->OpenFile(new_manifest_file, O_RDWR | O_CREAT);
     if (!descriptor_log_) {
       return Status::Corruption("create manifest error");
     }
@@ -259,7 +260,9 @@ Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
 void VersionSet::AppendVersion(Version *v) {
   assert(v != nullptr);
   assert(v->refs_ == 0);
-  current_->Unref();
+  if (current_ != nullptr) {
+    current_->Unref();
+  }
   current_ = v;
 
   v->prev_ = dummy_versions_.prev_;
@@ -268,8 +271,19 @@ void VersionSet::AppendVersion(Version *v) {
   v->next_->prev_ = v;
 }
 
-VersionSet::VersionSet(const std::string &dbname, const Options *options, const InternalKeyComparator *icmp)
-  : db_name_(dbname), options_(options), icmp_(icmp), dummy_versions_(this) {
+VersionSet::VersionSet(std::string dbname, const Options *options, const InternalKeyComparator *icmp)
+  : db_name_(std::move(dbname)),
+    options_(options),
+    icmp_(icmp),
+    dummy_versions_(this),
+    next_file_number_(1),
+    log_number_(0),
+    prev_log_number_(0),
+    manifest_file_number_(0),
+    last_sequence_(0),
+    current_(nullptr),
+    descriptor_log_writer_(nullptr),
+    descriptor_log_(nullptr) {
+  AppendVersion(new Version(this));
 }
-
 }

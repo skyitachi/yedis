@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cassert>
 
+#include <spdlog/spdlog.h>
 #include <folly/ConcurrentSkipList.h>
 
 #include "memtable.h"
@@ -49,6 +50,7 @@ void MemTable::Add(SequenceNumber seq, ValueType type, const Slice &key, const S
   //  tag          : uint64((sequence << 8) | type)
   //  value_size   : varint32 of value.size()
   //  value bytes  : char[value.size()]
+  auto before_allocated = ApproximateMemoryUsage();
   uint64_t key_size = key.size();
   uint64_t value_size = value.size();
   uint64_t internal_key_size = key_size + 8;
@@ -65,6 +67,8 @@ void MemTable::Add(SequenceNumber seq, ValueType type, const Slice &key, const S
   SkipList accessor(table_.get());
 
   accessor.add(Slice(start, encoded_len));
+  auto after_allocated = ApproximateMemoryUsage();
+  spdlog::info("[stats] before: {} after: {}", before_allocated, after_allocated);
 }
 
 bool MemTable::Get(const LookupKey &key, std::string *value, Status *s) {

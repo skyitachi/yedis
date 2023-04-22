@@ -20,6 +20,7 @@ AllocatedData::AllocatedData(Allocator& allocator, data_ptr_t pointer, idx_t all
   : allocator(&allocator), pointer(pointer), allocated_size(allocated_size) {
 }
 
+// 自带内存管理了
 AllocatedData::~AllocatedData() {
   Reset();
 }
@@ -72,7 +73,7 @@ private:
 #endif
 };
 
-PrivateAllocatorData::PrivateAllocatorData() {
+PrivateAllocatorData::PrivateAllocatorData(): allocated_(0) {
 }
 
 PrivateAllocatorData::~PrivateAllocatorData() {

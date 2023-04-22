@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <filesystem>
 #include <absl/strings/substitute.h>
 
 #include "exception.h"
@@ -100,6 +101,19 @@ int64_t LocalFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_byte
 
 int64_t LocalFileSystem::GetFileSize(FileHandle &handle) {
   return handle.FileSize();
+}
+
+bool LocalFileSystem::Exists(std::string_view path) {
+  return std::filesystem::exists(path);
+}
+
+Status LocalFileSystem::CreateDir(std::string_view dir) {
+  std::error_code ec;
+  bool succ = std::filesystem::create_directories(dir, ec);
+  if (succ) {
+    return Status::OK();
+  }
+  return Status::IOError(ec.message());
 }
 
 }

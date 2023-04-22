@@ -18,6 +18,7 @@ struct PrivateAllocatorData {
   virtual ~PrivateAllocatorData();
 
   std::unique_ptr<AllocatorDebugInfo> debug_info;
+  size_t allocated_;
 };
 
 typedef data_ptr_t (*allocate_function_ptr_t)(PrivateAllocatorData *private_data, idx_t size);
@@ -72,9 +73,11 @@ public:
     return AllocatedData(*this, AllocateData(size), size);
   }
   static data_ptr_t DefaultAllocate(PrivateAllocatorData *private_data, idx_t size) {
+    private_data->allocated_ += size;
     return (data_ptr_t)malloc(size);
   }
   static void DefaultFree(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t size) {
+    private_data->allocated_ -= size;
     free(pointer);
   }
   static data_ptr_t DefaultReallocate(PrivateAllocatorData *private_data, data_ptr_t pointer, idx_t old_size,
@@ -84,6 +87,10 @@ public:
 
   PrivateAllocatorData *GetPrivateData() {
     return private_data.get();
+  }
+
+  size_t size() const {
+    return private_data->allocated_;
   }
 
   static Allocator &DefaultAllocator();

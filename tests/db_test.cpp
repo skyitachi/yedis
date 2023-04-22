@@ -9,14 +9,26 @@
 #include "options.h"
 
 TEST(DBTest, Basic) {
-
   using namespace yedis;
   Options options;
   options.create_if_missing = true;
+  options.write_buffer_size = 24;
+  options.compression = CompressionType::kNoCompression;
   DB* db;
   Status s = DB::Open(options, "ydb_demo", &db);
   ASSERT_TRUE(s.ok());
 
+  WriteOptions w_opt;
+  s = db->Put(w_opt, "a", "b");
+  ASSERT_TRUE(s.ok());
+
+  s = db->Put(w_opt, "abc", "cdefg");
+  ASSERT_TRUE(s.ok());
+
+  s = db->Put(w_opt, "a10", "cdefg");
+  ASSERT_TRUE(s.ok());
+
+  sleep(10);
 }
 
 int main(int argc, char **argv) {

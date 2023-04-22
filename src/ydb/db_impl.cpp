@@ -1,6 +1,8 @@
 //
 // Created by Shiping Yao on 2023/3/12.
 //
+#include <iostream>
+
 #include "db_impl.h"
 #include "version_set.h"
 #include "memtable.h"
@@ -14,7 +16,6 @@
 #include "write_batch_internal.h"
 #include "db.h"
 
-
 namespace yedis {
 
 
@@ -22,6 +23,9 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   : db_name_(dbname),
     options_(raw_options),
     internal_comparator_(raw_options.comparator),
+    mem_(new MemTable()),
+    imm_(nullptr),
+    logfile_number_(0),
     versions_(new VersionSet(db_name_, &options_, &internal_comparator_)) {
   options_.file_system = new LocalFileSystem;
 }
@@ -33,6 +37,7 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   batch.Put(key, value);
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
   lock.lock();
+  std::cout << "mem size: " << mem_->ApproximateMemoryUsage() << ", write_buffer_size: " << options_.write_buffer_size << std::endl;
   Status s = MakeRoomForWrite(false);
   if (!s.ok()) {
     return s;
@@ -48,14 +53,15 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
     lock.lock();
     mem_->Add(last_sequence, ValueType::kTypeValue, key, value);
   }
-
+  lock.unlock();
+  // TODO: 这里要wait 压缩线程
   return s;
 }
 
 // Ignore force
 // mutex_ acquired
 Status DBImpl::MakeRoomForWrite(bool force) {
-  assert(mutex_.try_lock());
+  assert(!mutex_.try_lock());
   Status s;
   while (true) {
     if (!bg_error_.ok()) {
@@ -66,16 +72,17 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       background_work_finished_signal_.wait(lock);
       lock.release();
     } else if (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size) {
+
       // enough space
       break;
     } else {
       assert(versions_->PrevLogNumber() == 0);
       uint64_t new_log_number = versions_->NewFileNumber();
       delete wal_writer_;
-      delete wal_handle_;
-      // TODO: 这里如何使用unique_ptr管理file_handle
+      wal_handle_.reset(nullptr);
+      // TODO: 这里如何使用unique_ptr管理file_handle, 应该是可以直接赋值的
       wal_handle_ =
-          options_.file_system->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT).get();
+          options_.file_system->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT);
       wal_writer_ = new wal::Writer(*wal_handle_);
       imm_ = mem_;
       mem_ = new MemTable();
@@ -89,10 +96,14 @@ Status DBImpl::MakeRoomForWrite(bool force) {
 // just compact level0
 // mutex_ acquired
 void DBImpl::MaybeScheduleCompaction() {
-  assert(mutex_.try_lock());
+  assert(!mutex_.try_lock());
   if (imm_ != nullptr) {
     background_compaction_scheduled_ = true;
-    std::thread th([&]{ BackgroundCall(); });
+    std::cout << "start background call" << std::endl;
+    std::thread th(&DBImpl::BackgroundCall, this);
+    bg_thread_ = std::move(th);
+    // NOTE: 这里不能join，不然Background 会拿不到锁
+    // th.join();
   }
 }
 
@@ -101,6 +112,7 @@ void DBImpl::MaybeScheduleCompaction() {
 //}
 
 void DBImpl::BackgroundCall() {
+  std::cout << "in the background call" << std::endl;
   std::lock_guard<std::mutex> lock_guard(mutex_);
   assert(background_compaction_scheduled_);
   if (imm_ != nullptr) {
@@ -113,7 +125,8 @@ void DBImpl::BackgroundCall() {
 
 
 void DBImpl::CompactMemTable() {
-  assert(mutex_.try_lock());
+  std::cout << "in compact memtable" << std::endl;
+  assert(!mutex_.try_lock());
   assert(imm_ != nullptr);
   VersionEdit edit;
   Version* base = versions_->current();
@@ -135,7 +148,7 @@ void DBImpl::CompactMemTable() {
 }
 
 Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base) {
-  assert(mutex_.try_lock());
+  assert(!mutex_.try_lock());
   FileMetaData meta;
   // TODO:
   meta.number = versions_->NewFileNumber();
@@ -185,11 +198,24 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   return s;
 }
 
+void DBImpl::prepare() {
+  if (!options_.file_system->Exists(db_name_)) {
+    auto s = options_.file_system->CreateDir(db_name_);
+    assert(s.ok());
+  }
+  auto fs = options_.file_system;
+  auto log_number = versions_->NewFileNumber();
+  wal_handle_ = fs->OpenFile(LogFileName(db_name_, log_number), O_RDWR | O_CREAT);
+  wal_writer_ = new wal::Writer(*wal_handle_);
+}
+
 DB::~DB() = default;
 
 Status DB::Open(const Options &options, const std::string &name, DB **dbptr) {
   *dbptr = nullptr;
-  DBImpl* impl = new DBImpl(options, name);
+  auto* impl = new DBImpl(options, name);
+  *dbptr = impl;
+  impl->prepare();
   return Status::OK();
 }
 
