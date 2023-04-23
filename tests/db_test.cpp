@@ -27,8 +27,6 @@ TEST(DBTest, Basic) {
 
   s = db->Put(w_opt, "a10", "cdefg");
   ASSERT_TRUE(s.ok());
-
-  sleep(10);
 }
 
 int main(int argc, char **argv) {

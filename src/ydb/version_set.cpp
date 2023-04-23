@@ -25,7 +25,12 @@ static Status SetCurrentFile(FileSystem* fs, const std::string& dbname,
   if (written != full_content.size()) {
     return Status::Corruption("cannot write full data to disk when set current file");
   }
-  return Status::OK();
+  Status s = fs->RenameFile(tmp, CurrentFileName(dbname));
+  if (!s.ok()) {
+    fs->RemoveFile(tmp);
+    return s;
+  }
+  return s;
 }
 
 enum class Tag: uint32_t {
@@ -46,6 +51,7 @@ void Version::Unref() {
   assert(refs_ >= 1);
   --refs_;
   if (refs_ == 0) {
+    std::cout << "free here" << std::endl;
     delete this;
   }
 }
@@ -152,6 +158,7 @@ public:
         }
       }
     }
+    std::cout << "unref in builder deconstruct" << std::endl;
     base_->Unref();
   }
 
@@ -219,7 +226,6 @@ Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
 
   // Finalize
 
-  // TODO: save mainfest
   std::string new_manifest_file;
   Status s;
   if (!descriptor_log_) {
@@ -242,6 +248,7 @@ Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
     }
     // set current
     if (s.ok() && !new_manifest_file.empty()) {
+      // NOTE: 为什么这里需要加锁
       SetCurrentFile(options_->file_system, db_name_, manifest_file_number_);
     }
     mu->lock();
@@ -264,6 +271,7 @@ void VersionSet::AppendVersion(Version *v) {
     current_->Unref();
   }
   current_ = v;
+  current_->Ref();
 
   v->prev_ = dummy_versions_.prev_;
   v->next_ = &dummy_versions_;
@@ -279,11 +287,23 @@ VersionSet::VersionSet(std::string dbname, const Options *options, const Interna
     next_file_number_(1),
     log_number_(0),
     prev_log_number_(0),
-    manifest_file_number_(0),
+    manifest_file_number_(next_file_number_),
     last_sequence_(0),
     current_(nullptr),
     descriptor_log_writer_(nullptr),
     descriptor_log_(nullptr) {
   AppendVersion(new Version(this));
+}
+
+void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
+  for (Version* v = dummy_versions_.next_; v != &dummy_versions_;
+       v = v->next_) {
+    for (int level = 0; level < config::kNumLevels; level++) {
+      const std::vector<FileMetaData*>& files = v->files_[level];
+      for (size_t i = 0; i < files.size(); i++) {
+        live->insert(files[i]->number);
+      }
+    }
+  }
 }
 }

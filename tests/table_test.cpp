@@ -11,6 +11,7 @@
 #include <leveldb/filter_policy.h>
 #include <leveldb/env.h>
 #include <leveldb/comparator.h>
+#include <leveldb/db.h>
 
 #include "ydb/fs.hpp"
 #include "allocator.h"
@@ -135,6 +136,24 @@ TEST(LeveldbTableBuildTest, Basic) {
   table_builder->Finish();
   spdlog::info("status: {}", table_builder->status().ToString());
   delete table_builder;
+}
+
+TEST(LevelDBLogTest, Basic) {
+  using namespace leveldb;
+  leveldb::Options options{};
+  options.create_if_missing = true;
+  options.compression = leveldb::CompressionType::kNoCompression;
+  options.write_buffer_size = 64;
+  DB* db;
+  Status s = DB::Open(options, "ldb_demo", &db);
+  ASSERT_TRUE(s.ok());
+
+  WriteOptions wopt;
+
+  for (int i = 0; i < 1000; i++) {
+    db->Put(wopt, "k" + std::to_string(i), "v" + std::to_string(i));
+  }
+
 }
 
 TEST(TableTest, Basic) {

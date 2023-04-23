@@ -12,6 +12,16 @@
 
 namespace yedis {
 
+  enum class FileType: uint8_t {
+    kLogFile,
+    kDBLockFile,
+    kTableFile,
+    kDescriptorFile,
+    kCurrentFile,
+    kTempFile,
+    kInfoLogFile  // Either the current one, or an old one
+  };
+
   enum class ValueType: uint8_t { kTypeDeletion = 0x0, kTypeValue = 0x1 };
 
   static const ValueType kValueTypeForSeek = ValueType::kTypeValue;
@@ -119,6 +129,15 @@ namespace yedis {
   inline LookupKey::~LookupKey() {
     if (start_ != space_) delete[] start_;
   }
+// Owned filenames have the form:
+//    dbname/CURRENT
+//    dbname/LOCK
+//    dbname/LOG
+//    dbname/LOG.old
+//    dbname/MANIFEST-[0-9]+
+//    dbname/[0-9]+.(log|sst|ldb)
+bool ParseFileName(const std::string& filename, uint64_t* number, FileType* type);
+bool ConsumeDecimalNumber(Slice* in, uint64_t* val);
 }
 
 #endif //YEDIS_DB_FORMAT_H

@@ -7,6 +7,7 @@
 
 #include <condition_variable>
 #include <thread>
+#include <set>
 
 #include "db.h"
 #include "options.h"
@@ -48,11 +49,14 @@ public:
     return nullptr;
   }
 
-  void prepare();
 
 
 private:
+  friend class DB;
+
+  void prepare();
   void CompactMemTable();
+  Status Recover(VersionEdit* edit, bool *save_manifest);
   Status MakeRoomForWrite(bool force);
   Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base);
 
@@ -80,6 +84,8 @@ private:
   void MaybeScheduleCompaction();
   void BGWork(void *db);
   void BackgroundCall();
+  void RemoveObsoleteFiles();
+  std::set<uint64_t> pending_outputs_;
 
   std::thread bg_thread_;
 

@@ -47,6 +47,10 @@ class FileSystem {
   virtual int64_t Write(FileHandle& handle, void *buffer, int64_t nr_bytes) = 0;
   virtual bool Exists(std::string_view path) = 0;
   virtual Status CreateDir(std::string_view dir) = 0;
+  virtual Status RenameFile(const std::string& src, const std::string& target) = 0;
+  virtual Status RemoveFile(const std::string& src) = 0;
+
+  virtual Status GetChildren(const std::string& dir, std::vector<std::string>& result) = 0;
 
 
 };
@@ -85,6 +89,12 @@ public:
   bool Exists(std::string_view path) override;
 
   Status CreateDir(std::string_view dir) override;
+
+  Status RenameFile(const std::string& src, const std::string& target) override;
+
+  Status RemoveFile(const std::string& src) override;
+
+  Status GetChildren(const std::string& dir, std::vector<std::string>& result) override;
 
   ~LocalFileSystem() override = default;
 };

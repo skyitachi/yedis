@@ -116,4 +116,36 @@ Status LocalFileSystem::CreateDir(std::string_view dir) {
   return Status::IOError(ec.message());
 }
 
+Status LocalFileSystem::RemoveFile(const std::string &src) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  bool succ = fs::remove(src, ec);
+  if (succ) {
+    return Status::OK();
+  }
+  return Status::IOError(ec.message());
+}
+
+Status LocalFileSystem::RenameFile(const std::string &src, const std::string &target) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  fs::rename(src, target, ec);
+  if (ec) {
+    return Status::IOError(ec.message());
+  }
+  return Status::OK();
+}
+
+Status LocalFileSystem::GetChildren(const std::string &dir, std::vector<std::string> &result) {
+  namespace fs = std::filesystem;
+  assert(fs::is_directory(dir));
+  for (const auto& entry: fs::directory_iterator(dir)) {
+    if (entry.is_regular_file()) {
+      std::string file_name = entry.path().relative_path().filename().string();
+      result.push_back(file_name);
+    }
+  }
+  return Status::OK();
+}
+
 }

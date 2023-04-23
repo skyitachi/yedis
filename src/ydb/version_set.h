@@ -141,6 +141,7 @@ public:
   Status LogAndApply(VersionEdit* edit, std::mutex* mu);
   Status Recover(bool *save_manifest);
   void AppendVersion(Version* v);
+  void AddLiveFiles(std::set<uint64_t>* live);
 
 
 private:

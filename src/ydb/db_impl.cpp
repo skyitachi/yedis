@@ -15,6 +15,7 @@
 #include "write_batch.h"
 #include "write_batch_internal.h"
 #include "db.h"
+#include "db_format.h"
 
 namespace yedis {
 
@@ -68,14 +69,14 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       s = bg_error_;
       break;
     } else if (imm_ != nullptr) {
-      // TODO: should wait here
+      // NOTE: should wait here
       std::unique_lock<std::mutex> lock(mutex_, std::adopt_lock);
       std::cout << "wait here" << std::endl;
       background_work_finished_signal_.wait(lock);
       std::cout << "after wait" << std::endl;
       lock.release();
     } else if (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size) {
-      std::cout << "have enough time" << std::endl;
+      std::cout << "have enough space" << std::endl;
       // enough space
       break;
     } else {
@@ -87,6 +88,8 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       wal_handle_ =
           options_.file_system->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT);
       wal_writer_ = new wal::Writer(*wal_handle_);
+      // NOTE: important
+      logfile_number_ = new_log_number;
       imm_ = mem_;
       mem_ = new MemTable();
       mem_->Ref();
@@ -104,9 +107,8 @@ void DBImpl::MaybeScheduleCompaction() {
     background_compaction_scheduled_ = true;
     std::cout << "start background call" << std::endl;
     std::thread th(&DBImpl::BackgroundCall, this);
+    // NOTE: std::move 到一个持久的bg_thread_上，不然thread会自动析构
     bg_thread_ = std::move(th);
-    // NOTE: 这里不能join，不然Background 会拿不到锁
-    // th.join();
   }
 }
 
@@ -136,6 +138,7 @@ void DBImpl::CompactMemTable() {
   Version* base = versions_->current();
   base->Ref();
   Status s = WriteLevel0Table(imm_, &edit, base);
+  std::cout << "unref in compact memtable" << std::endl;
   base->Unref();
 
   if (s.ok()) {
@@ -148,14 +151,16 @@ void DBImpl::CompactMemTable() {
     // TODO: clear, 如何清理Memtable， unique_ptr是否可行
     imm_->Unref();
     imm_ = nullptr;
+    RemoveObsoleteFiles();
   }
 }
 
 Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base) {
   assert(!mutex_.try_lock());
   FileMetaData meta;
-  // TODO:
+
   meta.number = versions_->NewFileNumber();
+  pending_outputs_.insert(meta.number);
   Status s;
   Iterator* iter = mem->NewIterator();
   {
@@ -167,8 +172,9 @@ Status DBImpl::WriteLevel0Table(MemTable *mem, VersionEdit *edit, Version *base)
     return s;
   }
   delete iter;
-  // TODO: 补充下verion需要的信息
-  // 本次实现只写到level 0
+  pending_outputs_.erase(meta.number);
+
+  // NOTE: 本次实现只写到level 0
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest, meta.largest);
@@ -202,15 +208,87 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   return s;
 }
 
+Status DBImpl::Recover(VersionEdit *edit, bool *save_manifest) {
+
+}
+
 void DBImpl::prepare() {
   if (!options_.file_system->Exists(db_name_)) {
     auto s = options_.file_system->CreateDir(db_name_);
     assert(s.ok());
   }
   auto fs = options_.file_system;
-  auto log_number = versions_->NewFileNumber();
-  wal_handle_ = fs->OpenFile(LogFileName(db_name_, log_number), O_RDWR | O_CREAT);
+  auto new_log_number = versions_->NewFileNumber();
+  wal_handle_ = fs->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT);
   wal_writer_ = new wal::Writer(*wal_handle_);
+
+  VersionEdit edit;
+//  Status s = Recover();
+  edit.SetLogNumber(new_log_number);
+  logfile_number_ = new_log_number;
+  if (mem_ != nullptr) {
+    mem_->Ref();
+  }
+
+
+}
+
+void DBImpl::RemoveObsoleteFiles() {
+  assert(!mutex_.try_lock());
+
+  if (!bg_error_.ok()) {
+    return;
+  }
+
+  std::set<uint64_t> live = pending_outputs_;
+  versions_->AddLiveFiles(&live);
+
+  std::vector<std::string> filenames;
+  options_.file_system->GetChildren(db_name_, filenames);
+
+  uint64_t number;
+
+  FileType ft;
+  std::vector<std::string> files_to_delete;
+  for(const auto& filename: filenames) {
+    std::cout << "files: " << filename << std::endl;
+    if (ParseFileName(filename, &number, &ft)) {
+      bool keep = true;
+      switch (ft) {
+        case FileType::kLogFile:
+          keep = ((number >= versions_->LogNumber()) ||
+                  (number == versions_->PrevLogNumber()));
+          break;
+        case FileType::kDescriptorFile:
+          // Keep my manifest file, and any newer incarnations'
+          // (in case there is a race that allows other incarnations)
+          keep = (number >= versions_->ManifestFileNumber());
+          break;
+        case FileType::kTableFile:
+          keep = (live.find(number) != live.end());
+          break;
+        case FileType::kTempFile:
+          // Any temp files that are currently being written to must
+          // be recorded in pending_outputs_, which is inserted into "live"
+          keep = (live.find(number) != live.end());
+          break;
+        case FileType::kCurrentFile:
+        case FileType::kDBLockFile:
+        case FileType::kInfoLogFile:
+          keep = true;
+          break;
+      }
+
+      if (!keep) {
+        files_to_delete.push_back(std::move(filename));
+      }
+    }
+  }
+  mutex_.unlock();
+  for(const auto& filename: files_to_delete) {
+    options_.file_system->RemoveFile(db_name_ + "/" + filename);
+  }
+  mutex_.lock();
 }
 
 DB::~DB() = default;
