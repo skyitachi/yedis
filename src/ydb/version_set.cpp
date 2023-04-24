@@ -82,9 +82,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey &key, std::strin
     auto tname = TableFileName(vset_->db_name_, f->number);
     auto table_file_handle = vset_->options_->file_system->OpenFile(tname, O_RDONLY);
     Table *table;
-    Options table_opt = *vset_->options_;
-    table_opt.comparator = &vset_->icmp_;
-    s = Table::Open(table_opt, table_file_handle.get(), &table);
+    s = Table::Open(*vset_->options_, table_file_handle.get(), &table);
     if (!s.ok()) {
       return s;
     }
