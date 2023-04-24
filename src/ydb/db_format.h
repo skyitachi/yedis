@@ -50,7 +50,7 @@ namespace yedis {
 
   inline ValueType ExtractValueType(const Slice& internal_key) {
     assert(internal_key.size() >= 8);
-    return static_cast<ValueType>(internal_key.data()[internal_key.size() - 1]);
+    return static_cast<ValueType>(internal_key.data()[internal_key.size() - 8]);
   }
 
   class InternalKey {

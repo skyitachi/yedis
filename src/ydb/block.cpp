@@ -167,6 +167,7 @@ public:
   }
 
   void Seek(const Slice& target) override {
+    SeekToFirst();
     uint32_t left = 0;
     uint32_t right = num_restarts_ - 1;
     int current_key_compare = 0;

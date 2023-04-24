@@ -261,7 +261,6 @@ void DBImpl::RemoveObsoleteFiles() {
   FileType ft;
   std::vector<std::string> files_to_delete;
   for(const auto& filename: filenames) {
-    std::cout << "files: " << filename << std::endl;
     if (ParseFileName(filename, &number, &ft)) {
       bool keep = true;
       switch (ft) {
