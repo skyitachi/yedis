@@ -42,6 +42,7 @@ int InternalKeyComparator::Compare(const Slice &a, const Slice &b) const {
 }
 
 int InternalKeyComparator::Compare(const yedis::InternalKey &a, const yedis::InternalKey &b) const {
+  std::cout << "encoded length: " << a.Encode().size() << ", b: " << b.Encode().size() << std::endl;
   return Compare(a.Encode(), b.Encode());
 }
 

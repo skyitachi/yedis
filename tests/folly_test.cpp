@@ -4,8 +4,10 @@
 #include <spdlog/spdlog.h>
 #include <gtest/gtest.h>
 #include <thread>
+#include <atomic>
 
 #include <folly/MPMCQueue.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 
 #include "concurrent_blocking_queue.h"
 
@@ -59,7 +61,20 @@ TEST(ConcurrentBlockingQueue, Basic) {
   for(int i = 0; i < results.size(); i++) {
     ASSERT_EQ(i, results[i]);
   }
+}
 
+TEST(ThreadPoolExecutor, Basic) {
+  auto thread_pool = std::make_shared<folly::CPUThreadPoolExecutor>(4);
+  std::atomic<int> counter;
+  for(int i = 0; i < 10; i++) {
+    thread_pool->add([&]{
+      counter.fetch_add(1);
+    });
+  }
+  while(counter.load() != 10);
+
+  ASSERT_EQ(counter.load(), 10);
+  thread_pool->join();
 }
 
 int main(int argc, char **argv) {

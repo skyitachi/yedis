@@ -25,8 +25,19 @@ TEST(DBTest, Basic) {
   s = db->Put(w_opt, "abc", "cdefg");
   ASSERT_TRUE(s.ok());
 
+  // first compaction
   s = db->Put(w_opt, "a10", "cdefg");
   ASSERT_TRUE(s.ok());
+
+  s = db->Put(w_opt, "a12", "abcdefg");
+  ASSERT_TRUE(s.ok());
+
+  s = db->Put(w_opt, "a13", "abcdefg");
+  ASSERT_TRUE(s.ok());
+
+  s = db->Put(w_opt, "a14", "abcdefg");
+  ASSERT_TRUE(s.ok());
+  delete db;
 }
 
 int main(int argc, char **argv) {

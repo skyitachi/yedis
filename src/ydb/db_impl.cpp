@@ -3,6 +3,8 @@
 //
 #include <iostream>
 
+#include <folly/executors/CPUThreadPoolExecutor.h>
+
 #include "db_impl.h"
 #include "version_set.h"
 #include "memtable.h"
@@ -29,6 +31,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
     logfile_number_(0),
     versions_(new VersionSet(db_name_, &options_, &internal_comparator_)) {
   options_.file_system = new LocalFileSystem;
+  thread_pool_ = std::make_unique<folly::CPUThreadPoolExecutor>(8);
 }
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
@@ -106,9 +109,9 @@ void DBImpl::MaybeScheduleCompaction() {
   if (imm_ != nullptr) {
     background_compaction_scheduled_ = true;
     std::cout << "start background call" << std::endl;
-    std::thread th(&DBImpl::BackgroundCall, this);
-    // NOTE: std::move 到一个持久的bg_thread_上，不然thread会自动析构
-    bg_thread_ = std::move(th);
+    thread_pool_->add([&]{
+      BackgroundCall();
+    });
   }
 }
 
@@ -190,6 +193,7 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   std::string fname = TableFileName(dbname, meta->number);
   auto file_ptr = options.file_system->OpenFile(fname, O_CREAT | O_RDWR | O_TRUNC);
   auto builder = std::make_unique<TableBuilder>(options, file_ptr.get());
+  std::cout << "decode smallest: " << iter->key().size() << std::endl;
   meta->smallest.DecodeFrom(iter->key());
   Slice key;
   while(iter->Valid()) {
@@ -289,6 +293,10 @@ void DBImpl::RemoveObsoleteFiles() {
     options_.file_system->RemoveFile(db_name_ + "/" + filename);
   }
   mutex_.lock();
+}
+
+DBImpl::~DBImpl() noexcept {
+  thread_pool_->join();
 }
 
 DB::~DB() = default;

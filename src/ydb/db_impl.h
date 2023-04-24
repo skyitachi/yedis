@@ -9,6 +9,7 @@
 #include <thread>
 #include <set>
 
+#include <folly/executors/CPUThreadPoolExecutor.h>
 #include "db.h"
 #include "options.h"
 #include "wal.h"
@@ -26,7 +27,7 @@ struct FileMetaData;
 class DBImpl: public DB {
 public:
   DBImpl(const Options& raw_options, const std::string& dbname);
-  ~DBImpl() = default;
+  ~DBImpl();
 
   DBImpl(const DBImpl&) = delete;
   DBImpl& operator=(const DBImpl&) = delete;
@@ -86,6 +87,7 @@ private:
   void BackgroundCall();
   void RemoveObsoleteFiles();
   std::set<uint64_t> pending_outputs_;
+  std::unique_ptr<folly::CPUThreadPoolExecutor> thread_pool_;
 
   std::thread bg_thread_;
 

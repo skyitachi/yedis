@@ -90,6 +90,8 @@ namespace yedis {
     void FindShortestSeparator(std::string* start, const Slice& limit) const override;
     void FindShortSuccessor(std::string* key) const override;
 
+    const Comparator* user_comparator() const { return user_comparator_; }
+
   };
 
   class LookupKey {

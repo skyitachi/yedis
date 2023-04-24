@@ -182,7 +182,7 @@ public:
 
   // TODO: 重点检测这里的逻辑
   void SaveTo(Version *v) {
-    BySmallestKey cmp;
+    BySmallestKey cmp{};
     cmp.internal_comparator = &vset_->icmp_;
     for (int level = 0; level < config::kNumLevels; level++) {
       auto& base_files = base_->files_[level];
@@ -282,7 +282,7 @@ void VersionSet::AppendVersion(Version *v) {
 VersionSet::VersionSet(std::string dbname, const Options *options, const InternalKeyComparator *icmp)
   : db_name_(std::move(dbname)),
     options_(options),
-    icmp_(icmp),
+    icmp_(*icmp),
     dummy_versions_(this),
     next_file_number_(1),
     log_number_(0),
