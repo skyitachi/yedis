@@ -22,7 +22,6 @@ include_directories(include)
 aux_source_directory(src SOURCE_FILES)
 aux_source_directory(src/ydb SOURCE_FILES)
 
-message(STATUS "${SOURCE_FILES}"})
 #add_executable(yedis ${SOURCE_FILES})
 #target_link_libraries(yedis rocksdb spdlog::spdlog gtest)
 

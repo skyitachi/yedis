@@ -5,6 +5,7 @@
 #ifndef YEDIS_MEMTABLE_H
 #define YEDIS_MEMTABLE_H
 
+#include <atomic>
 #include <folly/ConcurrentSkipList.h>
 #include <folly/memory/Malloc.h>
 
@@ -35,11 +36,14 @@ class MemTable {
 
     void Ref() {
       refs_++;
+      std::cout << "Ref memtable " << id_ << std::endl;
     }
 
     void Unref() {
       refs_--;
+      std::cout << "Unref: release memtable: " << id_ << ", refs: " << refs_ << std::endl;
       if (refs_ == 0) {
+        std::cout << "Unref: release memtable: " << id_ << std::endl;
         delete this;
       }
     }
@@ -51,6 +55,8 @@ class MemTable {
   private:
     friend class MemTableIterator;
     static constexpr int kMaxHeight = 12;
+    static std::atomic<int> gid_;
+    int id_;
 
     using SkipListType = folly::ConcurrentSkipList<Slice, KeyComparator>;
     using SkipList = SkipListType::Accessor;
@@ -58,7 +64,6 @@ class MemTable {
     std::unique_ptr<SkipListType> table_;
 
     Allocator alloc_;
-
     int refs_;
 
 

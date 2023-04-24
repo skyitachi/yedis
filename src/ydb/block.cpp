@@ -52,6 +52,7 @@ uint32_t Block::NumRestarts() const {
 
 class Block::Iter : public Iterator {
 private:
+  // NOTE: comparator_不能是InternalKeyComparator
   const Comparator* const comparator_;
   const char* const data_;       // underlying block contents
   uint32_t const restarts_;      // Offset of restart array (list of fixed32)

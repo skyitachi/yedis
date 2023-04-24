@@ -42,15 +42,11 @@ public:
     return Status::NotSupported("no write method");
   };
 
-  Status Get(const ReadOptions& options, const Slice& key, std::string* value) override {
-    return Status::NotSupported("no get method");
-  }
+  Status Get(const ReadOptions& options, const Slice& key, std::string* value) override;
 
   Iterator* NewIterator(const ReadOptions& options) override {
     return nullptr;
   }
-
-
 
 private:
   friend class DB;

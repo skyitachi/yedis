@@ -7,6 +7,9 @@
 #include "version_set.h"
 #include "util.hpp"
 #include "fs.hpp"
+#include "table.h"
+#include "iterator.h"
+#include "db_format.h"
 
 namespace yedis {
 
@@ -54,6 +57,57 @@ void Version::Unref() {
     std::cout << "free here" << std::endl;
     delete this;
   }
+}
+
+static bool NewestFile(FileMetaData* a, FileMetaData* b) {
+  return a->number > b->number;
+}
+
+Status Version::Get(const ReadOptions& options, const LookupKey &key, std::string *val) {
+  // find in level 0
+  Status s;
+  auto internal_key = key.internal_key();
+  auto user_key = key.user_key();
+  auto ucmp = vset_->icmp_.user_comparator();
+  std::vector<FileMetaData* > maybes;
+  for(auto &f: files_[0]) {
+    if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0
+        && ucmp->Compare(user_key, f->largest.user_key()) <= 0) {
+      maybes.push_back(f);
+    }
+  }
+  std::sort(maybes.begin(), maybes.end(), NewestFile);
+  for(auto* f: maybes) {
+    // TableFileName()
+    auto tname = TableFileName(vset_->db_name_, f->number);
+    auto table_file_handle = vset_->options_->file_system->OpenFile(tname, O_RDONLY);
+    Table *table;
+    Options table_opt = *vset_->options_;
+    table_opt.comparator = &vset_->icmp_;
+    s = Table::Open(table_opt, table_file_handle.get(), &table);
+    if (!s.ok()) {
+      return s;
+    }
+    auto it = table->NewIterator(options);
+    it->Seek(internal_key);
+    if (!it->Valid()) {
+      return it->status();
+    }
+    InternalKey ikey;
+    ikey.DecodeFrom(it->key());
+    if (ucmp->Compare(ikey.user_key(), user_key) == 0) {
+      auto vt = ExtractValueType(it->key());
+      if (vt == ValueType::kTypeDeletion) {
+        return Status::NotFound("");
+      } else if (vt == ValueType::kTypeValue) {
+        val->assign(it->value().data(), it->value().size());
+        return Status::OK();
+      }
+      return Status::Corruption("unexpect value type");
+    }
+  }
+
+  return Status::NotFound("");
 }
 
 void VersionEdit::Clear() {

@@ -13,8 +13,12 @@
 
 namespace yedis {
 
+std::atomic<int> MemTable::gid_{0};
+
 MemTable::MemTable() {
   table_ = std::make_unique<SkipListType>(kMaxHeight);
+  id_ = gid_.fetch_add(1);
+  refs_ = 0;
 }
 
 static Slice GetLengthPrefixedSlice(const char *data) {

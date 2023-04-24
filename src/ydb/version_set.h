@@ -45,6 +45,7 @@ class Version {
 public:
   void Ref();
   void Unref();
+  Status Get(const ReadOptions&, const LookupKey& key, std::string* val);
 private:
   friend class VersionSet;
 

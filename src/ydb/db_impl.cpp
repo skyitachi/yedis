@@ -30,8 +30,11 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
     imm_(nullptr),
     logfile_number_(0),
     versions_(new VersionSet(db_name_, &options_, &internal_comparator_)) {
-  options_.file_system = new LocalFileSystem;
   thread_pool_ = std::make_unique<folly::CPUThreadPoolExecutor>(8);
+  // raw_options.comparator 定义的是user_comparator
+  options_ = raw_options;
+  options_.comparator = &internal_comparator_;
+  options_.file_system = new LocalFileSystem;
 }
 
 Status DBImpl::Put(const WriteOptions& options, const Slice& key,
@@ -57,8 +60,9 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   if (s.ok()) {
     lock.lock();
     mem_->Add(last_sequence, ValueType::kTypeValue, key, value);
+    versions_->SetLastSequence(last_sequence);
+    lock.unlock();
   }
-  lock.unlock();
   return s;
 }
 
@@ -192,6 +196,7 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
 
   std::string fname = TableFileName(dbname, meta->number);
   auto file_ptr = options.file_system->OpenFile(fname, O_CREAT | O_RDWR | O_TRUNC);
+  // TableBuilder的Comparator必须是InternalKeyOperator
   auto builder = std::make_unique<TableBuilder>(options, file_ptr.get());
   std::cout << "decode smallest: " << iter->key().size() << std::endl;
   meta->smallest.DecodeFrom(iter->key());
@@ -213,7 +218,7 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
 }
 
 Status DBImpl::Recover(VersionEdit *edit, bool *save_manifest) {
-
+  return Status::NotSupported("not implement");
 }
 
 void DBImpl::prepare() {
@@ -231,6 +236,7 @@ void DBImpl::prepare() {
   edit.SetLogNumber(new_log_number);
   logfile_number_ = new_log_number;
   if (mem_ != nullptr) {
+    // NOTE: important
     mem_->Ref();
   }
 
@@ -296,7 +302,43 @@ void DBImpl::RemoveObsoleteFiles() {
 }
 
 DBImpl::~DBImpl() noexcept {
+  mutex_.lock();
+  if (mem_ != nullptr) mem_->Unref();
+  if (imm_ != nullptr) imm_->Unref();
+  mutex_.unlock();
   thread_pool_->join();
+}
+
+Status DBImpl::Get(const ReadOptions &options, const Slice &key, std::string *value) {
+  Status s;
+  SequenceNumber snapshot;
+  std::unique_lock<std::mutex> lk(mutex_, std::defer_lock);
+  lk.lock();
+  snapshot = versions_->LastSequence();
+  MemTable* mem = mem_;
+  mem->Ref();
+  MemTable* imm = imm_;
+  if (imm != nullptr) {
+    imm->Ref();
+  }
+  Version* current = versions_->current();
+  current->Ref();
+  {
+    lk.unlock();
+    LookupKey lkey(key, snapshot);
+    if (mem->Get(lkey, value, &s)) {
+    } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
+    } else {
+      s = current->Get(options, lkey, value);
+    }
+    lk.lock();
+  }
+  mem->Unref();
+  if (imm != nullptr) {
+    imm->Unref();
+  }
+  current->Unref();
+  return s;
 }
 
 DB::~DB() = default;
