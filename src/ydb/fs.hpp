@@ -9,6 +9,7 @@
 #include <string_view>
 #include <unistd.h>
 #include <fcntl.h>
+#include <vector>
 
 #include "common/status.h"
 

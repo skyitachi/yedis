@@ -6,6 +6,7 @@
 #define YEDIS_DB_FORMAT_H
 
 #include <inttypes.h>
+#include <limits>
 
 #include "slice.h"
 #include "comparator.h"
