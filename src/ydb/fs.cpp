@@ -46,7 +46,7 @@ int64_t UnixFileHandle::FileSize() {
 }
 
 std::unique_ptr<FileHandle> LocalFileSystem::OpenFile(std::string_view path, int flags) {
-  int fd = ::open(path.data(), flags, 0666);
+  int fd = ::open(path.data(), flags, 0644);
   if (fd == -1) {
     throw IOException(absl::Substitute("Cannot open file $0: $1",
                                        path.data(), strerror(errno)));
@@ -147,5 +147,21 @@ Status LocalFileSystem::GetChildren(const std::string &dir, std::vector<std::str
   }
   return Status::OK();
 }
+
+Status LocalFileSystem::NewReadableFile(std::string_view path, std::unique_ptr<FileHandle> &result) {
+  result = OpenFile(path, O_RDONLY);
+  if (!result) {
+    return Status::IOError("open readable file error");
+  }
+  return Status::OK();
+}
+
+Status LocalFileSystem::NewWritableFile(std::string_view path, std::unique_ptr<FileHandle>& result) {
+  result = OpenFile(path, O_RDWR);
+  if (!result) {
+    return Status::IOError("open writable file error");
+  }
+  return Status::OK();
+};
 
 }

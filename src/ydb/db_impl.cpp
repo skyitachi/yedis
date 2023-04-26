@@ -217,23 +217,27 @@ Status DBImpl::BuildTable(const std::string &dbname, const Options &options, Ite
   return s;
 }
 
-Status DBImpl::Recover(VersionEdit *edit, bool *save_manifest) {
-  return Status::NotSupported("not implement");
-}
-
 void DBImpl::prepare() {
+  std::unique_lock<std::mutex> lk(mutex_);
   if (!options_.file_system->Exists(db_name_)) {
     auto s = options_.file_system->CreateDir(db_name_);
     assert(s.ok());
   }
+  bool save_manifest;
+  Status s = versions_->Recover(&save_manifest);
+  if (!s.ok()) {
+    return;
+  }
+
+  // TODO: recover log
+
+//  Status s = Recover();
+
   auto fs = options_.file_system;
   auto new_log_number = versions_->NewFileNumber();
   wal_handle_ = fs->OpenFile(LogFileName(db_name_, new_log_number), O_RDWR | O_CREAT);
   wal_writer_ = new wal::Writer(*wal_handle_);
 
-  VersionEdit edit;
-//  Status s = Recover();
-  edit.SetLogNumber(new_log_number);
   logfile_number_ = new_log_number;
   if (mem_ != nullptr) {
     // NOTE: important

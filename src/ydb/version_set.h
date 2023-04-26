@@ -22,6 +22,7 @@ namespace yedis {
 class VersionSet;
 class Version;
 class VersionEdit;
+class DBImpl;
 
 struct FileMetaData {
   FileMetaData(): refs(0), allowed_seeks(1 << 30), file_size(0) {}
@@ -112,6 +113,7 @@ public:
   Status DecodeFrom(const Slice& src);
 private:
   friend class VersionSet;
+  friend class DBImpl;
 
   using DeletedFileSet = std::set<std::pair<int, uint64_t>>;
 
@@ -143,6 +145,8 @@ public:
   Status Recover(bool *save_manifest);
   void AppendVersion(Version* v);
   void AddLiveFiles(std::set<uint64_t>* live);
+
+  void MarkFileNumberUsed(uint64_t number);
 
 
 private:

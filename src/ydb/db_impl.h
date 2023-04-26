@@ -50,6 +50,7 @@ public:
 
 private:
   friend class DB;
+  friend class VersionSet;
 
   void prepare();
   void CompactMemTable();

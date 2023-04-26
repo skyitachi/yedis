@@ -1,6 +1,7 @@
 //
 // Created by Shiping Yao on 2023/4/21.
 //
+#include <memory>
 #include <set>
 #include <utility>
 
@@ -287,7 +288,6 @@ Status VersionSet::LogAndApply(VersionEdit *edit, std::mutex *mu) {
       return Status::Corruption("create manifest error");
     }
     descriptor_log_writer_ = std::make_unique<wal::Writer>(*descriptor_log_);
-    // TODO: WriteSnapshot?
   }
 
   // write edit to manifest
@@ -336,7 +336,7 @@ VersionSet::VersionSet(std::string dbname, const Options *options, const Interna
     options_(options),
     icmp_(*icmp),
     dummy_versions_(this),
-    next_file_number_(1),
+    next_file_number_(1), // NOTE: init as 1
     log_number_(0),
     prev_log_number_(0),
     manifest_file_number_(next_file_number_),
@@ -358,4 +358,83 @@ void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
     }
   }
 }
+
+void VersionSet::MarkFileNumberUsed(uint64_t number) {
+  if (next_file_number_ <= number) {
+    next_file_number_ = number + 1;
+  }
+}
+
+Status VersionSet::Recover(bool *save_manifest) {
+  auto fs = options_->file_system;
+  auto cur_file_handle = fs->OpenFile(CurrentFileName(db_name_), O_RDONLY);
+  char buf[20];
+  int64_t read = cur_file_handle->Read(buf, 20);
+  std::string current_manifest_name = db_name_ + "/" + std::string(buf, read - 1);
+  Status s = fs->NewWritableFile(current_manifest_name, descriptor_log_);
+  if (!s.ok()) {
+    return s;
+  }
+  auto manifest_reader = std::make_unique<wal::Reader>(*descriptor_log_);
+  std::string raw_record;
+  Slice record;
+
+  bool have_log_number = false;
+  bool have_prev_log_number = false;
+  bool have_next_file = false;
+  bool have_last_sequence = false;
+
+  Builder builder(this, current_);
+
+  while(manifest_reader->ReadRecord(&record, &raw_record)) {
+    VersionEdit replay_edit;
+    s = replay_edit.DecodeFrom(record);
+    if (!s.ok()) {
+      return s;
+    }
+    if (replay_edit.comparator_ && replay_edit.comparator_.value() != icmp_.user_comparator()->Name()) {
+      return s = Status::InvalidArgument("unmatched comparator name");
+    }
+    builder.Apply(&replay_edit);
+
+    if (replay_edit.log_number_) {
+      log_number_ = replay_edit.log_number_.value();
+      have_log_number = true;
+    }
+    if (replay_edit.prev_log_number_) {
+      prev_log_number_ = replay_edit.prev_log_number_.value();
+      have_prev_log_number = true;
+    }
+    if (replay_edit.next_file_number_) {
+      next_file_number_ = replay_edit.next_file_number_.value();
+      have_next_file = true;
+    }
+    if (replay_edit.last_sequence_) {
+      last_sequence_ = replay_edit.last_sequence_.value();
+      have_last_sequence = true;
+    }
+  }
+  if (!have_next_file) {
+    return Status::Corruption("no meta-nextfile entry in manifest");
+  } else if (!have_log_number) {
+    return Status::Corruption("no meta-lognumber entry in manifest");
+  } else if (!have_last_sequence) {
+    return Status::Corruption("no meta-lastsequence entry in manifest");
+  }
+  if (!have_prev_log_number) {
+    prev_log_number_ = 0;
+  }
+  MarkFileNumberUsed(prev_log_number_);
+  MarkFileNumberUsed(log_number_);
+
+  auto *v = new Version(this);
+  builder.SaveTo(v);
+  AppendVersion(v);
+  manifest_file_number_ = next_file_number_ + 1;
+  next_file_number_++;
+
+  *save_manifest = true;
+  return s;
+}
+
 }

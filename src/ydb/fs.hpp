@@ -53,6 +53,8 @@ class FileSystem {
 
   virtual Status GetChildren(const std::string& dir, std::vector<std::string>& result) = 0;
 
+  virtual Status NewReadableFile(std::string_view path, std::unique_ptr<FileHandle>&) = 0;
+  virtual Status NewWritableFile(std::string_view path, std::unique_ptr<FileHandle>& result) = 0;
 
 };
 
@@ -96,6 +98,10 @@ public:
   Status RemoveFile(const std::string& src) override;
 
   Status GetChildren(const std::string& dir, std::vector<std::string>& result) override;
+
+  Status NewReadableFile(std::string_view path, std::unique_ptr<FileHandle>& result) override;
+
+  Status NewWritableFile(std::string_view path, std::unique_ptr<FileHandle>& result) override;
 
   ~LocalFileSystem() override = default;
 };
