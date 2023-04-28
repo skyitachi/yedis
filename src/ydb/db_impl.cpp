@@ -18,6 +18,7 @@
 #include "write_batch_internal.h"
 #include "db.h"
 #include "db_format.h"
+#include "exception.h"
 
 namespace yedis {
 
@@ -44,8 +45,6 @@ Status DBImpl::Put(const WriteOptions& options, const Slice& key,
   batch.Put(key, value);
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
   lock.lock();
-  std::cout << "mem size: " << mem_->ApproximateMemoryUsage() << ", write_buffer_size: " << options_.write_buffer_size << std::endl;
-  // TODO: 这里要wait 压缩线程
   Status s = MakeRoomForWrite(false);
   if (!s.ok()) {
     return s;
@@ -228,10 +227,46 @@ void DBImpl::prepare() {
   if (!s.ok()) {
     return;
   }
+  SequenceNumber max_seq(0);
+  const uint64_t min_log = versions_->LogNumber();
+  const uint64_t prev_log = versions_->PrevLogNumber();
+  std::vector<std::string> filenames;
+  s = options_.file_system->GetChildren(db_name_, filenames);
+  if (!s.ok()) {
+    throw Exception(s.ToString());
+  }
+  // construct live files
+  std::set<uint64_t> expected;
+  versions_->AddLiveFiles(&expected);
+  uint64_t number;
+  FileType ft;
+  std::vector<uint64_t> logs;
+  for(const auto& filename: filenames) {
+    if (ParseFileName(filename, &number, &ft)) {
+      expected.erase(number);
+      if (ft == FileType::kLogFile && (number >= min_log || number == prev_log)) {
+        logs.push_back(number);
+      }
+    }
+  }
 
-  // TODO: recover log
+  // verify existing filename with live files in versions->Recover
+  if (!expected.empty()) {
+    throw Exception("missing files");
+  }
 
-//  Status s = Recover();
+  // recover from logs
+  VersionEdit edit;
+  std::sort(logs.begin(), logs.end());
+  for (int i = 0; i < logs.size(); i++) {
+    //
+    auto log_number = logs[i];
+    bool last_log = i == logs.size() - 1;
+    s = RecoverLogFile(log_number, last_log, &save_manifest, &edit, &max_seq);
+    if (!s.ok()) {
+      break;
+    }
+  }
 
   auto fs = options_.file_system;
   auto new_log_number = versions_->NewFileNumber();
@@ -344,7 +379,62 @@ Status DBImpl::Get(const ReadOptions &options, const Slice &key, std::string *va
   return s;
 }
 
-DB::~DB() = default;
+// no reuse log
+Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log, bool *save_manifest, VersionEdit *edit,
+                              SequenceNumber *max_sequence) {
+  assert(!mutex_.try_lock());
+  Status s;
+  auto log_file_name = LogFileName(db_name_, log_number);
+  std::unique_ptr<FileHandle> log_handle;
+  s = options_.file_system->NewReadableFile(log_file_name, log_handle);
+  if (!s.ok()) {
+    return s;
+  }
+  auto log_reader = std::make_unique<wal::Reader>(*log_handle, 0);
+  Slice record;
+  std::string scratch;
+  WriteBatch batch;
+  SequenceNumber last_seq;
+  SequenceNumber max_seq(0);
+  int compactions = 0;
+  MemTable* mem = nullptr;
+  while (log_reader->ReadRecord(&record, &scratch)) {
+    // split k, v
+    WriteBatchInternal::SetContents(&batch, record);
+    last_seq = WriteBatchInternal::Sequence(&batch) + WriteBatchInternal::Count(&batch) - 1;
+    if (last_seq > max_seq) {
+      max_seq = last_seq;
+    }
+    if (mem == nullptr) {
+      mem = new MemTable();
+      mem->Ref();
+    }
+    s = WriteBatchInternal::InsertInto(&batch, mem);
+    if (!s.ok()) {
+      break;
+    }
+
+    if (mem->ApproximateMemoryUsage() >= options_.write_buffer_size) {
+      compactions++;
+      s = WriteLevel0Table(mem, edit, nullptr);
+      mem->Unref();
+      mem = nullptr;
+      if (!s.ok()) {
+        break;
+      }
+    }
+  }
+  *max_sequence = max_seq;
+
+  if (mem != nullptr && s.ok()) {
+    s = WriteLevel0Table(mem, edit, nullptr);
+    mem->Unref();
+  }
+
+  return s;
+}
+
+  DB::~DB() = default;
 
 Status DB::Open(const Options &options, const std::string &name, DB **dbptr) {
   *dbptr = nullptr;

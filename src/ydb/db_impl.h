@@ -54,7 +54,8 @@ private:
 
   void prepare();
   void CompactMemTable();
-  Status Recover(VersionEdit* edit, bool *save_manifest);
+  Status RecoverLogFile(uint64_t log_number, bool last_log, bool* save_manifest,
+                        VersionEdit* edit, SequenceNumber* max_sequence);
   Status MakeRoomForWrite(bool force);
   Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base);
 
@@ -80,7 +81,6 @@ private:
   bool background_compaction_scheduled_;
 
   void MaybeScheduleCompaction();
-  void BGWork(void *db);
   void BackgroundCall();
   void RemoveObsoleteFiles();
   std::set<uint64_t> pending_outputs_;
