@@ -278,8 +278,6 @@ void DBImpl::prepare() {
     // NOTE: important
     mem_->Ref();
   }
-
-
 }
 
 void DBImpl::RemoveObsoleteFiles() {

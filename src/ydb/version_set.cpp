@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include <utility>
+#include <iostream>
 
 #include "version_set.h"
 #include "util.hpp"
@@ -123,14 +124,17 @@ void VersionEdit::Clear() {
 void VersionEdit::EncodeTo(std::string *dst) {
   if (comparator_.has_value()) {
     PutVarint32(dst, static_cast<uint32_t>(Tag::kComparator));
+    std::cout << "encode comparator: " << comparator_.value() << std::endl;
     PutLengthPrefixedSlice(dst, comparator_.value());
   }
   if (log_number_.has_value()) {
     PutVarint32(dst, static_cast<uint32_t>(Tag::kLogNumber));
+    std::cout << "log number: " << log_number_.value() << std::endl;
     PutVarint64(dst, log_number_.value());
   }
   if (prev_log_number_.has_value()) {
     PutVarint32(dst, static_cast<uint32_t>(Tag::kPrevLogNumber));
+    std::cout << "prev log number: " << prev_log_number_.value() << std::endl;
     PutVarint64(dst, prev_log_number_.value());
   }
   if (next_file_number_.has_value()) {
@@ -162,8 +166,90 @@ void VersionEdit::EncodeTo(std::string *dst) {
   }
 }
 
-class VersionSet::Builder {
+Status VersionEdit::DecodeFrom(const Slice &src) {
+  const char *limit = src.data() + src.size();
+  const char *p = src.data();
+  uint32_t raw_tag;
+  do {
+    p = GetVarint32Ptr(p, limit, &raw_tag);
+    auto tag = static_cast<Tag>(raw_tag);
+    switch (tag) {
+      case Tag::kComparator: {
+        Slice input(p, limit - p);
+        Slice output;
+        auto succ = GetLengthPrefixedSlice(&input, &output);
+        if (!succ) {
+          return Status::Corruption("unexpected data");
+        }
+        std::cout << "decode comparator: " << output.ToString() << std::endl;
+        comparator_ = output.ToString();
+        break;
+      }
+      case Tag::kLogNumber: {
+        uint64_t log_number;
+        p = GetVarint64Ptr(p, limit, &log_number);
+        log_number_ = log_number;
+        std::cout << "decode log number: " << log_number << std::endl;
+        break;
+      }
+      case Tag::kPrevLogNumber: {
+        uint64_t prev_log_number;
+        p = GetVarint64Ptr(p, limit, &prev_log_number);
+        prev_log_number_ = prev_log_number;
+        break;
+      }
+      case Tag::kNextFileNumber: {
+        uint64_t next_file_number;
+        p = GetVarint64Ptr(p, limit, &next_file_number);
+        next_file_number_ = next_file_number;
+        break;
+      }
+      case Tag::kLastSequence: {
+        uint64_t lseq;
+        p = GetVarint64Ptr(p, limit, &lseq);
+        last_sequence_ = lseq;
+        break;
+      }
+      case Tag::kDeletedFile: {
+        uint32_t first;
+        uint64_t second;
+        p = GetVarint32Ptr(p, limit, &first);
+        p = GetVarint64Ptr(p, limit, &second);
+        deleted_file_.insert(std::make_pair<>(first, second));
+        break;
+      }
+      case Tag::kNewFile: {
+        uint32_t level;
+        FileMetaData f;
+        p = GetVarint32Ptr(p, limit, &level);
+        p = GetVarint64Ptr(p, limit, &f.number);
+        p = GetVarint64Ptr(p, limit, &f.file_size);
+        Slice input(p, limit - p);
+        Slice result;
+        bool succ = GetLengthPrefixedSlice(&input, &result);
+        if (!succ) {
+          return Status::Corruption("unexpected length prefixed slice");
+        }
+        f.smallest.DecodeFrom(result);
+        p = result.data() + result.size();
+        input = Slice(p, limit - p);
+        succ = GetLengthPrefixedSlice(&input, &result);
+        if (!succ) {
+          return Status::Corruption("unexpected length prefixed slice");
+        }
+        f.largest.DecodeFrom(result);
+        p = result.data() + result.size();
+        new_files_.emplace_back(level, f);
+        break;
+      }
+      default:
+        return Status::Corruption("unexpected tag");
+    }
+  } while (p < limit);
+  return Status::OK();
+}
 
+class VersionSet::Builder {
 private:
   struct BySmallestKey {
     const InternalKeyComparator* internal_comparator;
@@ -367,7 +453,11 @@ void VersionSet::MarkFileNumberUsed(uint64_t number) {
 
 Status VersionSet::Recover(bool *save_manifest) {
   auto fs = options_->file_system;
-  auto cur_file_handle = fs->OpenFile(CurrentFileName(db_name_), O_RDONLY);
+  auto current_fname = CurrentFileName(db_name_);
+  if (!fs->Exists(current_fname)) {
+    return Status::OK();
+  }
+  auto cur_file_handle = fs->OpenFile(current_fname, O_RDONLY);
   char buf[20];
   int64_t read = cur_file_handle->Read(buf, 20);
   std::string current_manifest_name = db_name_ + "/" + std::string(buf, read - 1);

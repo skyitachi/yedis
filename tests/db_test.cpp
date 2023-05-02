@@ -8,6 +8,25 @@
 #include "db.h"
 #include "options.h"
 
+TEST(DBTestRecover, Basic) {
+  using namespace yedis;
+  std::string db_name = "ydb_demo";
+
+  Options options;
+  options.create_if_missing = true;
+  options.write_buffer_size = 24;
+  options.compression = CompressionType::kNoCompression;
+  DB* db;
+  Status s = DB::Open(options, db_name, &db);
+  ASSERT_TRUE(s.ok());
+
+  ReadOptions ropt;
+  std::string value;
+  s = db->Get(ropt, "a", &value);
+  ASSERT_TRUE(s.ok());
+  ASSERT_EQ(value, "b");
+}
+
 TEST(DBTest, Basic) {
   using namespace yedis;
   namespace fs = std::filesystem;
